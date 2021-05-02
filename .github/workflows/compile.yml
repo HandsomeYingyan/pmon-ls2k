@@ -25,6 +25,8 @@ jobs:
 
     - name: Setup env
       run: echo "::add-path::/opt/gcc-4.4.0-pmon/bin" && echo "::set-env name=LD_LIBRARY_PATH::/opt/gcc-4.4.0-pmon/lib:"
+      env: 
+        ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
 
     - name: Compile ls2k-pi2
       run: cd zloader.ls2k-pi2 && make cfg && make tgt=rom && make dtb && cd ..
