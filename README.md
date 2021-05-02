@@ -11,6 +11,10 @@ Loongson Pi Gen 2
 
 Loongson education board
 
+### ls2k
+
+Loongson Pi Gen 1
+
 ### 3avirt
 
 QEMU loongson3-virt machine
