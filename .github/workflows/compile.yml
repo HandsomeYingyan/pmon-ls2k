@@ -41,6 +41,14 @@ jobs:
       with:
         name: pmon-ls2k-edu.bin
         path: zloader/gzrom-dtb.bin
+        
+    - name: Compile ls2k
+      run: cd zloader.ls2k && make cfg && make tgt=rom && make dtb && cd ..
+    - name: Upload ls2k
+      uses: actions/upload-artifact@v2
+      with:
+        name: pmon-ls2k.bin
+        path: zloader/gzrom-dtb.bin
 
     - name: Compile 3avirt
       run: cd zloader.3avirt && make cfg && make tgt=rom && cd ..

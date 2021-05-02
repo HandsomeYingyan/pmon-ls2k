@@ -4,6 +4,10 @@ machine         LS2K        mips    # CPU Architecture, Platform
 config          pmon 
 #option          VGAROM_IN_BIOS
 
+
+option      CONFIG_VIDEO_SPLASH
+option      CONFIG_VIDEO_LOGO_CUISI
+
 option		LOONGSON_2K
 option         	BOOT_PARAM
 option      	VRAM_SIZE=16
@@ -29,7 +33,7 @@ option      LS2K_STR
 #
 # Platform options
 #
-option		BONITOEL
+option		BONITOEL	
 option		DEVBD2E
 option		MIPS
 option		INET
@@ -187,9 +191,6 @@ usb*      	at ohci?
 ##### USB
 #uhci*		at pci? dev ? function ?
 #### Networking Devices
-#usbnet*      	at ohci?
-#ngbe*		at pci? dev ? function ?	# Intel 82576
-#txgbe*		at pci? dev ? function ?	# Intel 82576
 igb*		at pci? dev ? function ?	# Intel 82576
 select igb1
 
@@ -224,16 +225,16 @@ select		mod_usb_kbd
 
 
 #### IDE controllers
-option 		IDE_DMA
+#option 		IDE_DMA
 pciide* 	at pci ? dev ? function ? flags 0x0000
 
 #### IDE hard drives
 wd*		at pciide? channel ? drive ? flags 0x0000
 
-#loopdev0	at mainbus0
+loopdev0	at mainbus0
 #sdcard0		at localbus0 flags 0
 
-select	sdio
+#select	sdio
 
 #### Pseudo devices
 pseudo-device	loop	1	# network loopback
@@ -248,7 +249,7 @@ select 		iso9660
 option		IDECD 
 select		cmd_testfire
 #option		HAVE_NB_SERIAL
-option		USE_ENVMAC
+#option		USE_ENVMAC
 #option		LOOKLIKE_PC
 #select		cmd_lwdhcp
 #select		cmd_bootp
@@ -272,23 +273,22 @@ select		inet
 select		nand
 select cmd_xyzmodem
 #select		spinand_mt29f
-select		m25p80
+#select		m25p80
 
 select	can
 select yaffsfs
 #option LS2H_SPI_HIGHSPEED
 #option DISABLE_HARD_LEVELING
 ##ifzxd
-select		spinand_lld
+#select		spinand_lld
+##option DDR_PARAM_018="0x2525252516100000"
 option DDR_PARAM_018="0x3030303016100000"
-#option DDR_PARAM_1e8="0x0f0f0f0f0f0f0f0f"
-#option DDR_PARAM_1e0="0x0f0f0f0f0f0f0f0f"
-#option DDR_PARAM_018="0x2020202016100000"
+####option DDR_PARAM_1e8="0x0f0f0f0f0f0f0f0f"
+####option DDR_PARAM_1e0="0x0f0f0f0f0f0f0f0f"
 option DDR_S1=0xc1a18404
-#option DDR_S1=0xc0a18804
-#option DDR_S1=0xc0911004
-option CONFIG_UART0_SPLIT
 option NO_AUTO_TRFC
+###option DDR_S1=0xc0a18804
+#option CONFIG_UART0_SPLIT
 #elif zongzingzilian
 #option DDR_PARAM_018="0x2020202016100000"
 #option CONFIG_DDR_32BIT
@@ -297,7 +297,7 @@ option NO_AUTO_TRFC
 #option RESERVED_COREMASK=2
 #elif 6s
 #rmoption HAVE_TOD
-#option DDR_RESET_REVERT
+option DDR_RESET_REVERT
 #option DDR_PARAM_018="0x3030303016100000"
 #option DDR_PARAM_1e8="0x030900000f0f0f0f"
 #option DDR_S1=0xc1a10404
@@ -310,25 +310,13 @@ option BEEP_GPIO=0
 #option AUTO_DDR_CONFIG
 #option USE_LS2H_I2C
 #option DDR_PARAM_018="0x4545454516100000"
-##plyh
+###plyh
 #option DDR_PARAM_018="0x4545454516100000"
 #option CONFIG_LS2K_NAND
 #option DDR_S1=0xc1a10404
 #rmoption AUTO_DDR_CONFIG
 #unselect nand
 #unselect spinand_lld
-
-###loongsonpiev0
-#option DDR_S1=0xc1a18404
-#option DDR_PARAM_018="0x4545454516100000"
-##option DDR_PARAM_018="0x3030303016100000"
-#option NO_AUTO_TRFC
-#option DDR_RESET_REVERT
-###loongsonpie
-#option DDR_S1=0xc1a18404
-#option DDR_PARAM_018="0x3030303016100000"
-#option NO_AUTO_TRFC
-#option DDR_RESET_REVERT
 ###czc
 #option CONFIG_LS2K_NAND
 #select nand_bch
@@ -346,33 +334,19 @@ select i2c
 #option CONFIG_DDR_16BIT
 #option DDR_S1=0xc1e10104
 #option DDR_RESET_REVERT
-##dongtu
-#option DDR_S1=0xc1a18104
-#option CONFIG_DDR_32BIT
-#option NO_AUTO_TRFC
-#option DDR_RESET_REVERT
-#option DDR_PARAM_018="0x4545454516100000"
-##tky
-#option DDR_S1=0xc1a18404
-#option DDR_PARAM_018="0x2020202016100000"
-#option DDR_RESET_REVERT
-#option NO_AUTO_TRFC
-#option GPIO_PINS="0xfffffffffff0000f"
-#option GPIO_OUT_PINS="0x01fff00000000000"
-#option  GPIO_OUT_SET="0x0f0b300000000000"
-#option  GPIO_OUT_CLR="0x10f4c00000000000"
-#option	LS2K_SELLIO
-#option	PCIE_LANE_FLIP=0
 
-option LS2K_RESET_GPIOS_MASK="0x400000000" # GPIO34
-
-option CONFIG_VIDEO_LOGO
-option CONFIG_VIDEO_BMP_LOGO
+#option CONFIG_VIDEO_LOGO
+#option CONFIG_VIDEO_BMP_LOGO
 option DDR_FREQ=400
-option CORE_FREQ=800
-#option LOWPOWER
-select raw_ether
-
-#option LS2K_NO_ACPI # ACPI have been disabled by hardware
-
-option LS2K_DEFAULT_OLDPMON
+option CORE_FREQ=1000
+#option PCI_PROBE_ONLY
+#loongson pai
+option  PAI2
+option  HS0636
+#option	PCI1_P0_TXRX_REVERSE
+option  LCD_EN
+select sii9022a
+option	SEL_HDA
+option	GPIO36_RESET_PHY
+#option	ENABLE_ALL_SERIAL
+option	UART0_ENABLE
