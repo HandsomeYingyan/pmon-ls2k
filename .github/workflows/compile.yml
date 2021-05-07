@@ -28,22 +28,6 @@ jobs:
       env: 
         ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
 
-    - name: Compile ls2k-pi2
-      run: cd zloader.ls2k-pi2 && make cfg && make tgt=rom && make dtb && cd ..
-    - name: Upload ls2k-pi2
-      uses: actions/upload-artifact@v2
-      with:
-        name: pmon-ls2k-pi2.bin
-        path: zloader/gzrom-dtb.bin
-
-    - name: Compile ls2k-edu
-      run: cd zloader.ls2k-edu && make cfg && make tgt=rom && make dtb && cd ..
-    - name: Upload ls2k-edu
-      uses: actions/upload-artifact@v2
-      with:
-        name: pmon-ls2k-edu.bin
-        path: zloader/gzrom-dtb.bin
-        
     - name: Compile ls2k
       run: cd zloader.ls2k && make cfg && make tgt=rom && cd ..
     - name: Upload ls2k
@@ -52,18 +36,10 @@ jobs:
         name: pmon-ls2k.bin
         path: zloader/gzrom.bin
 
-    - name: Compile 3avirt
-      run: cd zloader.3avirt && make cfg && make tgt=rom && cd ..
-    - name: Upload 3avirt
+    - name: Compile ls2k-dtb
+      run: cd zloader.ls2k && make cfg && make tgt=rom && make dtb && cd ..
+    - name: Upload ls2k-dtb
       uses: actions/upload-artifact@v2
       with:
-        name: pmon-3avirt.bin
-        path: zloader/gzrom.bin
-
-    - name: Compile lm-a1901
-      run: cd zloader.lm-a1901 && make cfg && make tgt=rom && cd ..
-    - name: Upload lm-a1901
-      uses: actions/upload-artifact@v2
-      with:
-        name: pmon-lm-a1901.bin
-        path: zloader/gzrom.bin
+        name: pmon-ls2k.bin-dtb
+        path: zloader/gzrom-dtb.bin
