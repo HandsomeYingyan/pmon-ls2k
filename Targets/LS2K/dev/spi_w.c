@@ -721,27 +721,23 @@ ls1x_spi_write_read_8bit(struct spi_device *spi,
 {
 	struct ls1x_spi *ls1x_spi = spi->dev;
 	unsigned char value;
-	int i, ret;
+	int i;
 	
-	for(i = 0; i < 4 && i < num; i++) {
-		if (tx_buf && *tx_buf)
-			value = *((*tx_buf)++);
-		else 
-			value = 0;
-		ls1x_spi_write_reg(ls1x_spi, FIFO, value);
-	}
-
-	ret = i;
-
-	for(;i > 0; i--) {
+	if (tx_buf && *tx_buf){
+		ls1x_spi_write_reg(ls1x_spi, FIFO, *((*tx_buf)++));
  		while((ls1x_spi_read_reg(ls1x_spi, SPSR) & 0x1) == 1);
-		value = ls1x_spi_read_reg(ls1x_spi, FIFO);
-		if (rx_buf && *rx_buf) 
-			*(*rx_buf)++ = value;
+	}else{
+		ls1x_spi_write_reg(ls1x_spi, FIFO, 0);
+ 		while((ls1x_spi_read_reg(ls1x_spi, SPSR) & 0x1) == 1);
 	}
 
+	if (rx_buf && *rx_buf) {
+		*(*rx_buf)++ = ls1x_spi_read_reg(ls1x_spi, FIFO);
+	}else{
+		  ls1x_spi_read_reg(ls1x_spi, FIFO);
+	}
 
-	return ret;
+	return 1;
 }
 
 
@@ -750,7 +746,7 @@ ls1x_spi_write_read(struct spi_device *spi, struct spi_transfer *xfer)
 {
 	struct ls1x_spi *ls1x_spi;
 	unsigned int count;
-	int ret;
+	int word_len;
 	const u8 *tx = xfer->tx_buf;
 	u8 *rx = xfer->rx_buf;
 
@@ -758,9 +754,9 @@ ls1x_spi_write_read(struct spi_device *spi, struct spi_transfer *xfer)
 	count = xfer->len;
 
 	do {
-		if ((ret = ls1x_spi_write_read_8bit(spi, &tx, &rx, count)) < 0)
+		if (ls1x_spi_write_read_8bit(spi, &tx, &rx, count) < 0)
 			goto out;
-		count -= ret;
+		count--;
 	} while (count);
 
 out:
@@ -782,7 +778,7 @@ static int ls_spi_setup(struct ls1x_spi *ls1x_spi,  struct spi_device *spi)
 
 	hz  = spi->max_speed_hz;
 
-	if (hz) {
+	if ( hz && ls1x_spi->hz != hz) {
 		clk = 100000000;
 		div = DIV_ROUND_UP(clk, hz);
 
@@ -885,8 +881,8 @@ spinand_probe(&spi_nand);
 int ls2h_m25p_probe()
 {
     spi_initw();
-    m25p_probe(&spi_nand1, "gd25q80");
-    m25p_probe(&spi_nand, "gd25q256");
+    m25p_probe(&spi_nand1, "gd25q128");
+    m25p_probe(&spi_nand, "gd25q128");
     spi_initr();
 }
 #endif
