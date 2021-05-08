@@ -103,7 +103,6 @@ stack = start - 0x4000		/* Place PMON stack below PMON start in RAM */
 
 
 	/*WatchDog_Close*/
-#if 1
 	li  t0, 0xbfe0011c
 	li  t2, ~(1 << 11)
 	lw  t1, 0x4(t0)
@@ -112,9 +111,6 @@ stack = start - 0x4000		/* Place PMON stack below PMON start in RAM */
 	lw  t1, 0x0(t0)
 	and t1, t2
 	sw  t1, 0x0(t0)
-#endif
-
-	WatchDog_Close
 
 	/*enable rs780e vGA*/
 	li  t2, ~(1 << 14)
@@ -432,10 +428,8 @@ gs_2f_v3_ddr2_cfg:
 	dli	s1, 0x0000200000000000
 #include "loongson3_clksetting.S"
 
-#ifndef WITHOUT_CPU3
 	dli	s1, 0x0000300000000000
 #include "loongson3_clksetting.S"
-#endif
 
 
 //#include "loongson3_HT_init.S"
@@ -560,7 +554,6 @@ MEM_INIT_DONE:
     	//dli     s1, 0xc1c30400c1c30404  // use MC0
     	//dli     s1, 0xc1a10400c1a10404  // use MC0, 2G SCS UDIMM
     	dli     s1, 0xf0a31000f0a31000  // use both, 8G SCS RDIMM
-	//dli     s1, 0xf0a31004
 #endif
 //#include "ddr_dir/loongson3_ddr2_config.S"
 #include "ddr_dir/loongson3A2000_ddr2_config.S"
@@ -862,8 +855,7 @@ MEM_INIT_DONE:
     bgt     v0, a1, 330f
     nop
 #endif
-#ifndef WITHOUT_CPU3
-//NODE3
+#if 1 //NODE3
     	TTYDBG("NODE 3 MEMORY CONFIG BEGIN\r\n")
 
 #ifdef  AUTO_DDR_CONFIG

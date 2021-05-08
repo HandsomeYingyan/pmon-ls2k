@@ -596,14 +596,12 @@ initmips(unsigned int raw_memsz)
     //}
 #endif
 
-#ifndef NOSB
     /*
      * Launch!
      */
     _pci_conf_write(_pci_make_tag(0,0,0),0x90,0xff800000);
 
     w83795_config();
-#endif
 
     main();
 }
@@ -621,7 +619,6 @@ extern int fb_init(unsigned long,unsigned long);
 
 extern unsigned long long uma_memory_base;
 extern unsigned long long uma_memory_size;
-static int have_pci = 0;
 
 void tgt_devconfig()
 {
@@ -664,7 +661,6 @@ void tgt_devconfig()
 #endif
 #endif
 #endif
-        if (have_pci)
 	_pci_devinit(1);	/* PCI device initialization */
 #if (NMOD_X86EMU_INT10 > 0)||(NMOD_X86EMU >0)
 	SBD_DISPLAY("VGAI", 0);
@@ -748,7 +744,7 @@ void tgt_devconfig()
 	configure();
 	//#if ((NMOD_VGACON >0) &&(PCI_IDSEL_VIA686B !=0)|| (PCI_IDSEL_CS5536 !=0))
 #if NMOD_VGACON >0
-	if(1 || getenv("nokbd")) rc=1;
+	if(getenv("nokbd")) rc=1;
 	else {
 		rc=kbd_initialize();
 	}
@@ -859,9 +855,7 @@ run:
 #endif
 	printf("devconfig done.\n");
 
-#ifndef NOSB
 	sb700_interrupt_fixup();
-#endif
 }
 
 extern int test_icache_1(short *addr);
@@ -1116,7 +1110,6 @@ tgt_devinit()
 	cs5536_init();
 #endif
 
-#ifndef NOSB
 	tgt_printf("rs780_early_setup\n");
 	rs780_early_setup();
 
@@ -1179,7 +1172,6 @@ tgt_devinit()
 	value = _pci_conf_read32(_pci_make_tag(0, 0x14, 0), 0xac);
 	value &= ~(1 << 8);
 	_pci_conf_write32(_pci_make_tag(0, 0x14, 0), 0xac, value);
-#endif
 #endif
 
 
@@ -1244,12 +1236,9 @@ tgt_devinit()
 #endif
 	}
 #endif
-#ifndef NOSB
 	superio_reinit();
-#endif
 	uart_init();
 
-        if (have_pci)
 	_pci_businit(1);	/* PCI bus initialization */
 #if defined(VIA686B_POWERFIXUP) && (PCI_IDSEL_VIA686B != 0)
 	if(getenv("noautopower"))	vt82c686_powerfixup();
@@ -1259,9 +1248,7 @@ tgt_devinit()
 	cs5536_pci_fixup();
 #endif
 	tgt_printf("sb700_after_pci_fixup\n");
-#ifndef NOSB
 	sb700_after_pci_fixup();
-#endif
 }
 
 

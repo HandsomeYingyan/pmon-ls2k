@@ -135,6 +135,143 @@ get_line(char *line, int how)
 }
 #endif
 
+static int load_menu_list()
+{
+        char* rootdev = NULL;
+        char* path = NULL;
+	int retid;
+        struct device *dev, *next_dev;
+        char load[256];
+        memset(load, 0, 256);
+
+	show_menu=1;
+
+        if (path == NULL)
+        {
+        	path = malloc(512);
+                if (path == NULL)
+                {
+                	return 0;
+                }
+       	}
+        memset(path, 0, 512);
+
+       	rootdev = getenv("bootdev");
+        if (rootdev == NULL)
+	{
+		int wd,sd;
+		wd = sd = 0;
+		for (dev  = TAILQ_FIRST(&alldevs); dev != NULL; dev = next_dev) {
+			next_dev = TAILQ_NEXT(dev, dv_list);
+			if(dev->dv_class < DV_DISK) {
+				continue;
+			}
+
+			if (strncmp(dev->dv_xname, "wd", 2) == 0) {
+				wd = 1;
+			}
+			else if (strncmp(dev->dv_xname, "sd", 2) == 0) {
+				sd = 1;
+			}
+		}
+
+		if (sd) rootdev = "/dev/fs/ext2@sd0";
+		else rootdev = "/dev/fs/ext2@wd0";
+	}
+
+       //try to read boot.cfg from USB disk first
+        for (dev  = TAILQ_FIRST(&alldevs); dev != NULL; dev = next_dev) {
+                next_dev = TAILQ_NEXT(dev, dv_list);
+                if(dev->dv_class < DV_DISK) {
+                        continue;
+                }
+
+                if (strncmp(dev->dv_xname, "usb", 3) == 0) {
+                        sprintf(load, "bl -d ide /dev/fs/ext2@%s/boot/boot.cfg", dev->dv_xname);
+                        retid = do_cmd(load);
+                        if (retid == 0) {
+                                return 1;
+                        }
+                        sprintf(load, "bl -d ide /dev/fs/ext2@%s/boot.cfg", dev->dv_xname);
+                        retid = do_cmd(load);
+                        if (retid == 0) {
+                                return 1;
+                        }
+                        sprintf(load, "bl -d ide /dev/fs/fat@%s/boot/boot.cfg", dev->dv_xname);
+                        retid = do_cmd(load);
+                        if (retid == 0) {
+                                return 1;
+                        }
+                        sprintf(load, "bl -d ide /dev/fs/fat@%s/boot.cfg", dev->dv_xname);
+                        retid = do_cmd(load);
+                        if (retid == 0) {
+                                return 1;
+                        }
+                        sprintf(load, "bl -d ide /dev/fs/iso9660@%s/boot/boot.cfg", dev->dv_xname);
+                        retid = do_cmd(load);
+                        if (retid == 0) {
+                                return 1;
+                        }
+                        sprintf(load, "bl -d ide /dev/fs/iso9660@%s/boot.cfg", dev->dv_xname);
+                        retid = do_cmd(load);
+                        if (retid == 0) {
+                                return 1;
+                        }
+                }
+        }
+
+        //try to read boot.cfg from CD-ROM disk second
+        for (dev  = TAILQ_FIRST(&alldevs); dev != NULL; dev = next_dev) {
+                next_dev = TAILQ_NEXT(dev, dv_list);
+                if(dev->dv_class < DV_DISK) {
+                        continue;
+                }
+
+                if (strncmp(dev->dv_xname, "cd", 2) == 0) {
+                        sprintf(load, "bl -d ide /dev/fs/iso9660@%s/boot/boot.cfg", dev->dv_xname);
+                        retid = do_cmd(load);
+                        if (retid == 0) {
+                                return 1;
+                        }
+                        sprintf(load, "bl -d ide /dev/fs/iso9660@%s/boot.cfg", dev->dv_xname);
+                        retid = do_cmd(load);
+                        if (retid == 0) {
+                                return 1;
+                        }
+                }
+        }
+
+        //try to read boot.cfg from sata disk third
+	sprintf(path, "%s/boot/boot.cfg", rootdev);
+	if (check_config(path) == 1)
+	{
+		sprintf(path, "bl -d ide %s/boot/boot.cfg", rootdev);
+		if (do_cmd(path) == 0)
+		{
+			show_menu = 0;
+			free(path);
+			path = NULL;
+			return 1;
+		}
+		
+	}else{
+
+			sprintf(path, "%s/boot.cfg", rootdev);
+			if (check_config(path) == 1)
+			{
+				sprintf(path, "bl -d ide %s/boot.cfg", rootdev);
+				if (do_cmd(path) == 0)
+				{
+					show_menu = 0;
+					free(path);
+					path = NULL;
+					return 1;
+				}
+			}
+	}
+        
+}
+
 int check_user_password()
 {
 	char buf[50];
@@ -330,11 +467,8 @@ main()
 {
 	char prompt[32];
 	int i;
-#if defined(ARB_LEVEL) || defined(VREF_STORE)
+#ifdef ARB_LEVEL
 	save_board_ddrparam(0);
-#endif
-#ifdef CONFIG_VIDEO_SPLASH
-	video_enableoutput();
 #endif
 	if(cmd_main_mutex == 2)
 		;
@@ -344,8 +478,7 @@ main()
 			;
 		else {
 			bios_available = 1;//support usb_kbd in bios
-			tty_flush();
-			do_cmd("bootdev_sel");
+			load_menu_list();
 			bios_available = 0;
 		}
 	}
@@ -491,8 +624,6 @@ static int autoload(char *s)
 		printf("Press any other key to abort.\n");
 		ioctl (STDIN, CBREAK, &sav);
 		lastt = 0;
-		if (!dly) ioctl (STDIN, FIONREAD, &cnt);
-		else
 		do {
 	//		delay(1000000);
 			printf ("\b\b%02d", --dly);
@@ -699,10 +830,6 @@ dbginit (char *adr)
 	memsize = memorysize;
 
 	__init();	/* Do all constructor initialisation */
-
-#ifdef CONFIG_VIDEO_SPLASH
-	video_disableoutput();
-#endif
 
 	SBD_DISPLAY ("ENVI", CHKPNT_ENVI);
 	envinit ();
@@ -1024,14 +1151,9 @@ initstack (ac, av, addenv)
 
 void get_memorysize(unsigned long long raw_memsz) {
 	unsigned long long memsz,mem_size;
-	//tgt_printf("raw_memsz: 0x%llx\n", raw_memsz);
-//3A4000 use 1GB unit to transfer memsize
+//	tgt_printf("raw_memsz: 0x%llx\n", raw_memsz);
 	memsz = raw_memsz & 0xff;
-#ifdef LOONGSON3A4000 
-	memsz = memsz << 30;
-#else
 	memsz = memsz << 29;
-#endif
 	memsz = memsz - 0x1000000;
 	memsz = memsz >> 20;
 	/*
@@ -1044,30 +1166,18 @@ void get_memorysize(unsigned long long raw_memsz) {
 
 #ifdef MULTI_CHIP
 	memsz = raw_memsz & 0xff00;
-	memsz = memsz >> 8;
-#ifdef LOONGSON3A4000 
-	memsz = memsz << 30;
-#else
-	memsz = memsz << 29;
-#endif
+    memsz = memsz >> 8;
+    memsz = memsz << 29;
     memorysize_high_n1 = (memsz == 0) ? 0 : (memsz - (256 << 20));
 
     memsz = raw_memsz & 0xff0000;
     memsz = memsz >> 16;
-#ifdef LOONGSON3A4000 
-	memsz = memsz << 30;
-#else
-	memsz = memsz << 29;
-#endif
+    memsz = memsz << 29;
     memorysize_high_n2 = (memsz == 0) ? 0 : (memsz - (256 << 20));
 
 	memsz = raw_memsz & 0xff000000;
-	memsz = memsz >> 24;
-#ifdef LOONGSON3A4000 
-	memsz = memsz << 30;
-#else
-	memsz = memsz << 29;
-#endif
+    memsz = memsz >> 24;
+    memsz = memsz << 29;
     memorysize_high_n3 = (memsz == 0) ? 0 : (memsz - (256 << 20));
 #endif
 	memorysize_total =  ((memorysize  +  memorysize_high)  >> 20) + 16;

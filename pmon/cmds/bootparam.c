@@ -6,9 +6,6 @@
 #ifdef LS3A2H_STR
 #define LS3A2H_STR_FUNC_ADDR 0xffffffffbfc00500
 #endif
-#ifdef LS3A7A_STR
-#define LS3A7A_STR_FUNC_ADDR 0xffffffffbfc00500
-#endif
 
 struct loongson_params  g_lp = { 0 };
 struct efi_memory_map_loongson g_map = { 0 };
@@ -20,7 +17,7 @@ struct interface_info g_board = { 0 };
 struct loongson_special_attribute g_special = { 0 };
 #ifdef LS7A
 unsigned char readspi_result[128 * 1024] = {0};
-extern	char  Vbios[];
+#include "../../Targets/Bonito3a3000_7a/dev/7aVbios.h"
 #endif
 
 extern void poweroff_kernel(void);
@@ -63,9 +60,6 @@ void init_reset_system(struct efi_reset_system_t *reset)
   reset->ResetWarm = &reboot_kernel;
 #ifdef LS3A2H_STR
   reset->ResetCold = LS3A2H_STR_FUNC_ADDR;
-#endif
-#ifdef LS3A7A_STR
-  reset->ResetCold = LS3A7A_STR_FUNC_ADDR;
 #endif
 #ifdef LOONGSON_3ASINGLE  
   reset->DoSuspend = 0xffffffffbfc00500;
@@ -235,10 +229,6 @@ void init_loongson_params(struct loongson_params *lp)
 
 #define readl(addr)             ((*(volatile unsigned int *)((long)(addr))))
 
-#ifdef LOONGSON_2K
-  #define PRID_IMP_LOONGSON    0x6100
-  enum loongson_cpu_type cputype = Legacy_2K;
-#endif
 #ifdef LOONGSON_3BSINGLE
 #ifdef LOONGSON_3B1500
   #define PRID_IMP_LOONGSON    0x6307
@@ -251,7 +241,7 @@ void init_loongson_params(struct loongson_params *lp)
   #define PRID_IMP_LOONGSON    0x6306
   enum loongson_cpu_type cputype = Legacy_3B;
 #endif
-#if  defined ( LOONGSON_3ASINGLE) || defined ( LOONGSON_3A2H)
+#if  defined ( LOONGSON_3ASINGLE) || defined ( LOONGSON_3A2H) || defined(LOONGSON_2K)
   #define PRID_IMP_LOONGSON    0x6305
   enum loongson_cpu_type cputype = Legacy_3A;
 #endif
@@ -278,10 +268,6 @@ struct efi_cpuinfo_loongson *init_cpu_info()
   unsigned int available_core_mask = 0;
   unsigned int available = 0;
 
-#ifdef LOONGSON3A4000
-  c->vers = 2;
-  strcpy(c->cpuname,"Loongson-3A R4 (Loongson-3A4000)"); /*cpu name*/
-#endif
   c->processor_id = PRID_IMP_LOONGSON;
   c->cputype  = cputype;
 
@@ -292,13 +278,8 @@ struct efi_cpuinfo_loongson *init_cpu_info()
   c->nr_cpus = 16;
 #endif
 #ifdef LOONGSON_3ASERVER
-#ifdef CHIP_4
   c->total_node = 4;
-  c->nr_cpus = 16;
-#else
-  c->total_node = 2;
   c->nr_cpus = 8;
-#endif
 #endif
 #ifdef LOONGSON_3BSINGLE
   c->total_node = 4;
@@ -399,18 +380,6 @@ struct system_loongson *init_system_loongson()
 }
 #endif
 
-#ifdef LOONGSON3A4000
-  s->nr_uarts = 1;
-  s->uarts[0].iotype = 2; //UPIO_MEM
-#ifdef BONITO_100M
-  s->uarts[0].uartclk = 100000000; //100M clk
-#else 
-  s->uarts[0].uartclk = 25000000; //25M clk
-#endif
-  s->uarts[0].int_offset = 2; //56 + 2
-  s->uarts[0].uart_base = 0x1fe001e0; //uart 0
-#endif
-
   return s;
 }
 
@@ -451,8 +420,6 @@ struct irq_source_routing_table *init_irq_source()
 	irq_info->pci_io_start_addr = 0xffffffffbfd00000;
 #elif defined(LOONGSON_2F1A)
 	irq_info->pci_io_start_addr = 0xffffffffbfd00000;
-#elif defined(LOONGSON_2K) || defined(LOONGSON3_VIRT)
-  irq_info->pci_io_start_addr = 0x18000000; /* PHY ADDR! */
 #else
 	irq_info->pci_io_start_addr = 0x00000efdfc000000;
 #endif
@@ -463,7 +430,7 @@ struct irq_source_routing_table *init_irq_source()
 	irq_info->pci_mem_start_addr = 0x40000000ul;
 #endif
 	irq_info->pci_mem_end_addr = 0x7ffffffful;
-#if defined(RS780E) || defined(LS7A) || defined(LOONGSON_2K)
+#if (defined RS780E || defined LS7A)
 	irq_info->dma_mask_bits= 64;
 #else
 	irq_info->dma_mask_bits = 32;

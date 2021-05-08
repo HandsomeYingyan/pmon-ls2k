@@ -40,14 +40,11 @@
 		compatible = "loongson,nbus", "simple-bus";
 		#address-cells = <2>;
 		#size-cells = <1>;
-		enable-lpc-irq;
 		ranges = <0x000 0x00000000 0x000 0x00000000 0x20000000
 			  0x000 0x20000000 0x000 0x20000000 0x10000000
 			  0x000 0x40000000 0x000 0x40000000 0x40000000
 			  0xe00 0x00000000 0xe00 0x00000000 0x80000000>;
-		/*
 		enable-lpc-irq;
-		*/
 
 		uart0: serial@0x10080000 {
 			device_type = "serial";
@@ -89,7 +86,6 @@
 			no-loopback-test;
 		};
 
-		/*
 
 		uart4: serial@0x180003f8 {
 			device_type = "serial";
@@ -110,7 +106,6 @@
 			interrupt-parent = <&platic>;
 			no-loopback-test;
 		};
-		*/
 
 		uart6: serial@0x1fe001e8 {
 			device_type = "serial";

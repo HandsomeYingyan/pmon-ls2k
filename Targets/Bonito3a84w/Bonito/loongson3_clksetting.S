@@ -10,7 +10,7 @@ ATTENTION:
 
 #ifdef SOFT_CLKSEL
 
-#ifndef DDR_FREQ
+#ifndef
 #define DDR_FREQ    528
 #endif
 
@@ -23,7 +23,7 @@ ATTENTION:
 #define DDR_LOOPC  (DDR_FREQ*DDR_DIV/33)   //48 //396MHz
 
 // L1_* define both CPU and Node freq simutanleously
-#ifndef CORE_FREQ
+#ifndef
 #define CORE_FREQ    800
 #endif
 

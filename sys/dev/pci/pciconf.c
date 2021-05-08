@@ -254,6 +254,16 @@ static int pcie_set_readrq(struct pci_device *dev, int rq)
 		return -EINVAL;
 
 	tag = _pci_make_tag(dev->pa.pa_bus, dev->pa.pa_device, dev->pa.pa_function);
+	/*
+	 * If using the "performance" PCIe config, we clamp the
+	 * read rq size to the max packet size to prevent the
+	 * host bridge generating requests larger than we can
+	 * cope with
+	 */
+	mps = pcie_get_mps(dev);
+
+	if (mps < rq)
+		rq = mps;
 
 	if (pci_get_capability(0, tag, PCI_CAP_ID_EXP, &offset, &value)) {
 		v = (ffs(rq) - 8) << 12;
@@ -266,81 +276,11 @@ static int pcie_set_readrq(struct pci_device *dev, int rq)
 	return 0;
 }
 
-static int pcie_get_branch_min_mps(struct pci_device *dev)
-{
-	struct pci_device *pcidev;
-	unsigned int mps = 4096;
-	unsigned int value;
-	for (pcidev = dev; pcidev != NULL; pcidev = pcidev->parent) {
-
-		/* 2k1000/ls7a skip bus 0, device 0, function 0 */
-		if (pcidev->pa.pa_tag == 0)
-			continue;
-
-		value = pcie_get_mpss(pcidev);
-		if (mps > value)
-			mps = value;
-	}
-	return mps;
-}
-
-static void pcie_set_branch_min_mps(struct pci_device *dev, int mps)
-{
-	int rc;
-	struct pci_device *pcidev;
-	for (pcidev = dev; pcidev != NULL; pcidev = pcidev->parent) {
-
-		/* 2k1000/ls7a skip bus 0, device 0, function 0 */
-		if (pcidev->pa.pa_tag == 0)
-			continue;
-
-		rc = pcie_set_mps(pcidev, mps);
-		if (rc)
-			printf("Failed attempting to set the MPS\n");
-	}
-}
-static int pcie_get_tree_min_mps(struct pci_device *dev)
-{
-	struct pci_device *pd;
-	int ret;
-	int value = 0;
-
-	for (pd = dev->bridge.child; pd != NULL; pd = pd->next) {
-		//printf("line %d  bus %d dev %d\n",__LINE__, pd->pa.pa_bus, pd->pa.pa_device);
-		if (PCI_ISCLASS(pd->pa.pa_class, PCI_CLASS_BRIDGE, PCI_SUBCLASS_BRIDGE_PCI)) {
-			ret = pcie_get_tree_min_mps(pd);
-			//printf("line %d  bus %d dev %d ret %d value %d\n",__LINE__, pd->pa.pa_bus, pd->pa.pa_device,ret, value);
-			if (ret && ((ret < value) || (value == 0)))
-				value = ret;
-		} else {
-			value = pcie_get_branch_min_mps(pd);
-			//printf("line %d  bus %d dev %d value %d\n",__LINE__,pd->pa.pa_bus , pd->pa.pa_device, value);
-		}
-	}
-	return value;
-}
-
-static int pcie_set_tree_min_mps(struct pci_device *dev, int mps)
-{
-	struct pci_device *pd;
-	int ret;
-
-	for (pd = dev->bridge.child; pd != NULL; pd = pd->next) {
-		//printf("line %d  bus %d dev %d\n",__LINE__, pd->pa.pa_bus, pd->pa.pa_device);
-		if (PCI_ISCLASS(pd->pa.pa_class, PCI_CLASS_BRIDGE, PCI_SUBCLASS_BRIDGE_PCI)) {
-			pcie_set_tree_min_mps(pd, mps);
-		} else {
-			pcie_set_branch_min_mps(pd, mps);
-			//printf("line %d  bus %d dev %d mps %d\n",__LINE__,pd->pa.pa_bus , pd->pa.pa_device, mps);
-		}
-	}
-}
 /* modify max payload size as minimal value of bridge and this device */
 static void pcie_write_mps(struct pci_device *dev)
 {
+	int rc;
 	struct pci_device *pcidev;
-	struct pci_device *pd;
-	struct pci_device *pdd;
 	int value;
 	int mps;
 
@@ -350,17 +290,27 @@ static void pcie_write_mps(struct pci_device *dev)
 	if (PCI_VENDOR(_pci_conf_read(dev->pa.pa_tag, PCI_ID_REG)) == 0xffff)
 		return;
 
-	for (pcidev = dev; pcidev->pa.pa_bus > 0; pcidev = pcidev->parent) {
-		//printf("--> bus %d dev %d\n",pcidev->pa.pa_bus, pcidev->pa.pa_device);
-	}
-	/* pcidev is the last level device */
 	/* find the minimal max payload size */
-	if (pcidev->pa.pa_tag == dev->pa.pa_tag) {
-		mps = pcie_get_branch_min_mps(pcidev);
-		pcie_set_branch_min_mps(pcidev, mps);
-	} else {
-		mps = pcie_get_tree_min_mps(pcidev);
-		pcie_set_tree_min_mps(pcidev, mps);
+	for (pcidev = dev; pcidev != NULL; pcidev = pcidev->parent) {
+		/* 2k1000 skip bus 0, device 0, function 0 */
+		if (pcidev->pa.pa_tag == 0)
+			continue;
+
+		value = pcie_get_mpss(pcidev);
+
+		if (mps > value)
+			mps = value;
+	}
+
+	for (pcidev = dev; pcidev != NULL; pcidev = pcidev->parent) {
+
+		/* 2k1000 skip bus 0, device 0, function 0 */
+		if (pcidev->pa.pa_tag == 0)
+			continue;
+
+		rc = pcie_set_mps(pcidev, mps);
+		if (rc)
+			printf("Failed attempting to set the MPS\n");
 	}
 }
 
@@ -370,20 +320,24 @@ static void pcie_write_mrrs(struct pci_device *dev)
 	int rc, mrrs;
 	struct pci_device *pcidev;
 
-	/* set device mmrs to pcie slot max mrrs support capability */
-	for (pcidev = dev; pcidev->pa.pa_bus > 0; pcidev = pcidev->parent) {
-		//printf("--> bus %d dev %d\n",pcidev->pa.pa_bus, pcidev->pa.pa_device);
-	}
-	mrrs = pcie_get_readrq(pcidev);
-	rc = pcie_set_readrq(dev, mrrs);
-	if (rc)
-		printf("Failed attempting to set the MPS\n");
+	/* For Max performance, the MRRS must be set to the largest supported
+	 * value.  However, it cannot be configured larger than the MPS the
+	 * device or the bus can support.  This should already be properly
+	 * configured by a prior call to pcie_write_mps.
+	 */
+	mrrs = pcie_get_mps(dev);
 
-	mrrs = 128;
-	for (pcidev = dev->parent; pcidev != NULL; pcidev = pcidev->parent) {
+	/* MRRS is a R/W register.  Invalid values can be written, but a
+	 * subsequent read will verify if the value is acceptable or not.
+	 * If the MRRS value provided is not acceptable (e.g., too large),
+	 * shrink the value until it is acceptable to the HW.
+	 */
+	for (pcidev = dev; pcidev != NULL; pcidev = pcidev->parent) {
+
 		/* 2k1000 skip bus 0, device 0, function 0 */
 		if (pcidev->pa.pa_tag == 0)
 			continue;
+
 		rc = pcie_set_readrq(pcidev, mrrs);
 		if (rc)
 			printf("Failed attempting to set the MPS\n");
@@ -460,21 +414,6 @@ __attribute__((weak)) int pci_get_busno(struct pci_device *pd, int bus)
 {
 	return bus + 1;
 }
-
-void set_pcie_port_type(struct pci_device *pdev)
-{
-	pcitag_t tag = pdev->pa.pa_tag;
-	int offset;
-	pcireg_t value;
-	if (!pci_get_capability(0, tag, PCI_CAP_ID_EXP, &offset, &value))
-	  return;
-
-	pdev->is_pcie = 1;
-	pdev->pcie_cap = offset;
-	pdev->pcie_type = ((value>>16) & PCI_EXP_FLAGS_TYPE) >> 4;
-}
-
-
 
 /*
  * Scan each PCI device on the system and record its configuration
@@ -654,8 +593,6 @@ _pci_query_dev_func (struct pci_device *dev, pcitag_t tag, int initialise)
             extern int _max_pci_bus;
             _pci_bus[_max_pci_bus++] = pd;
         }
-
-	set_pcie_port_type(pd);
 
         /* Scan secondary bus of the bridge */
         _pci_scan_dev(pd, pd->bridge.secbus_num, 0, initialise);

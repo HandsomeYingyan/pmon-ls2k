@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 python pmonenv.py -f gzrom.bin -o 0x70000 -s 512 al=/dev/mtd0 append="'root=/dev/mtdblock0'"
 python ../tools/pmonenv.py -f gzrom-dtb.bin -d ls2k.dtb -w  al=/dev/ram@p0x110000000 al1=/dev/ram@p0x110000000 append="'console=ttyS0,115200 initcall_debug=1 loglevel=20 nosmp'" FR=1
@@ -45,8 +44,6 @@ def writeenv(fname,foff,fsz,d):
 
 def writehexenv(fname,hexbin):
     f=open(fname,'rb+')
-    f.seek(foff+fsz, 0)
-    f.write('\xff'*256)
     for b in hexbin.split(','):
       i,v = b.split(':')
       f.seek(foff+int(i,0),0)
@@ -57,7 +54,7 @@ def writedtb(fname,dtb,foff):
     f=open(dtb,'rb')
     a=f.read();
     f.close()
-    a=a.ljust(0x4000-8,b'\x00')
+    a=a.ljust(0x4000-8,'\x00')
     b = struct.pack('I',(-sum(struct.unpack(''+str(len(a)//4)+'I',a)))&0xffffffff)
     a=b+a+b
     

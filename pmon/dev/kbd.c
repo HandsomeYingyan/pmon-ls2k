@@ -2,7 +2,6 @@
 #include<linux/types.h>
 #include<linux/io.h>
 #include"kbd.h"
-#include <mod_usb_ohci.h>
 
 /*
  * Translation of escaped scancodes to keycodes.
@@ -169,10 +168,8 @@ static void kbd_wait(void)
 		if (!(status & KBD_STAT_IBF))
 			return;
 		delay(1000);     //  don not exceed 100ms,or usb keyboard may suspend when you  press
-#if NMOD_USB_OHCI
 		if(ohci_index)   //   deal with usb kbd
 			dl_ohci_kbd();
-#endif
 		timeout--;
 	} while (timeout);
 }
@@ -234,10 +231,8 @@ static int kbd_wait_for_input(void)
 		if (retval >= 0)
 			return retval;
 		delay(1000);    //don not exceed 100ms, or usb kbd may suspend
-#if NMOD_USB_OHCI
 		if(ohci_index)  // deal with usb kbd
                        dl_ohci_kbd();
-#endif
 	} while (--timeout);
 	return -1;
 }
@@ -245,7 +240,7 @@ static int kbd_wait_for_input(void)
 static void kbd_write_output_w(int data)
 {
 	kbd_wait();
-#if	defined(LOONGSON_2G5536) || defined(LOONGSON_2G1A) || defined(LOONGSON_2F1A)
+#if	defined(LOONGSON_2G5536) || defined(LOONGSON_2G1A) || defined(LOONGSON_2F1A) || defined(LS7A)
 	/* loongson 2g+5536 PS2 kbd Laps Lock key needs delay when pressed,
 	 * otherwise the PS2 kbd cann't be used.
 	 * the same to the loongson 2g5+1a+ddr3 PS2.
@@ -307,9 +302,6 @@ int kbd_initialize(void)
 {
 	int status;
 	int count;
-#ifdef NO_SUPERIO
-	return 0;
-#endif
 
 #ifdef LOONGSON2F_7INCH
 	status = kb3310_test();
@@ -379,7 +371,7 @@ int kbd_initialize(void)
 		if (status == KBD_REPLY_ACK)
 			break;
 		if (status != KBD_REPLY_RESEND) {
-//			printf("reset failed\n");
+			printf("reset failed\n");
 			if (++count > 1)
 				break;
 			//return 2;
@@ -387,7 +379,7 @@ int kbd_initialize(void)
 	} while (1);
 
 	if (kbd_wait_for_input() != KBD_REPLY_POR) {
-		//printf("NO POR, ignored!\n");
+		printf("NO POR, ignored!\n");
 		//return 3;
 	}
 
@@ -397,7 +389,19 @@ int kbd_initialize(void)
 	 *
 	 * Set up to try again if the keyboard asks for RESEND.
 	 */
-	count = 1;
+#ifndef FCRSOC
+	count = 0;
+	do {
+		kbd_write_output_w(KBD_CMD_DISABLE);
+		status = kbd_wait_for_input();
+		if (status == KBD_REPLY_ACK)
+			break;
+		if (status != KBD_REPLY_RESEND)
+			if (++count > 1)
+				break;
+			//return 4;
+	} while (1);
+#endif
 
 	kbd_write_command_w(KBD_CCMD_WRITE_MODE);
 	kbd_write_output_w(KBD_MODE_KBD_INT
@@ -464,7 +468,7 @@ int kbd_translate(unsigned char scancode, unsigned char *keycode)
 		else
 			capslock = 0;
 		kbd_write_output_w(KBD_CMD_SET_LEDS);
-#if	defined(LOONGSON_2G5536)||defined(LOONGSON_2G1A) || defined(LOONGSON_2F1A)
+#if	defined(LOONGSON_2G5536)||defined(LOONGSON_2G1A) || defined(LOONGSON_2F1A) || defined(LS7A)
 		/* PS/2 kbd needs delay between write operations */
 		while (kbd_read_status() & KBD_STAT_IBF)
 			delay(10);

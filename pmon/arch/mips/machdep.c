@@ -132,12 +132,7 @@ md_cpuname()
  		return CPU_NAME;
 #endif
 		return("GODSON1");
-	}
-	
-	if(((md_cputype() >> 16) & 0xffff) == Loongson_CPU) {
-	//Get CPU name from registers 3A4000+
-		return((volatile long *)(0xBFE00020));
-	} else {
+	default:
 		return("unidentified");
 	}
 }

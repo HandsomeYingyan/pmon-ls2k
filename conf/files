@@ -351,6 +351,7 @@ file x86emu/int10/vesafb.c		mod_vesa & mod_framebuffer		needs-flag
 
 file fb/cfb_console.c                                       mod_framebuffer         needs-flag
 file pmon/dev/kbd.c			mod_vgacon	needs-flag
+#file pmon/dev/kbd.c
 file pmon/dev/vgacon.c			mod_vgacon	needs-flag
 
 file pmon/dev/cpc700_iic.c		cpc700
@@ -409,9 +410,6 @@ define usbbus {}
 device usb: disk 
 attach usb at usbbus
 
-device	usbnet: ether, ifnet
-attach	usbnet at usbbus
-
 define ahcibus {}
 
 file sys/dev/usb/usb.c			  mod_usb
@@ -432,8 +430,6 @@ file sys/dev/nand/fcr-nand.c      nand
 file pmon/fs/mtd.c		  nand
 file  sys/dev/nand/cmdlinepart.c  nand needs-flag
 
-file sys/dev/usb/usbnet.c	 usbnet needs-flag
-
 #file sys/dev/nand/yaf-nand/nand_util.c      nand      #lxy
 
 file sys/dev/nand/nand_bch.c	  nand_bch needs-flag
@@ -447,8 +443,6 @@ file pmon/loaders/exec_txt.c
 file pmon/cmds/menulist2f.c     mod_display
 file pmon/cmds/boot_cfg.c
 file pmon/common/bootkernel.c
-file pmon/cmds/libmenu.c     mod_display
-file pmon/cmds/bootdev_sel.c     mod_display
 
 #FDT
 file lib/libfdt/fdt.c			cmd_dtb

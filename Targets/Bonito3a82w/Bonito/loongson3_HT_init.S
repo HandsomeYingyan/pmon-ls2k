@@ -364,10 +364,27 @@ ht_next_id :
 	TTYDBG("HT RX DMA address ENABLE done 1\r\n")
 
 
+#if 1
 	li	t0, 0xc0000000
 	sw	t0, 0x8(t2)
 	li	t0, 0x00008000
 	sw	t0, 0xc(t2)
+#elif 0
+	li	t0, 0xc0000080
+	sw	t0, 0x8(t2)
+	li	t0, 0x0080ffc0
+	sw	t0, 0xc(t2)
+#elif 0
+	li	t0, 0xc0000090
+	sw	t0, 0x8(t2)
+	li	t0, 0x0090fff0
+	sw	t0, 0xc(t2)
+#else
+	li	t0, 0xc0000080
+	sw	t0, 0x8(t2)
+	li	t0, 0x0080ffc0
+	sw	t0, 0xc(t2)
+#endif
 	TTYDBG("HT RX DMA address ENABLE done 2\r\n")
 
 #if 0

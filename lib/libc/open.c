@@ -45,7 +45,7 @@ static char *fat_support(int fnamelen, char *dname)
 {
 	char *temp = NULL;
 
-	temp = (char *)malloc(fnamelen + 2 + 1);
+	temp = (char *)malloc((fnamelen - 5) + 2 + 1);
 	if (strncmp (dname, "fs/fat", 6) == 0) {
 		strcpy(temp, dname);
 		temp += 6;
@@ -128,7 +128,6 @@ open(filename, mode)
 		j = filename_path_transform(dname,tname);    
 		if (j == 0){ 
 			dname = tname;
-			fnamelen = strlen(dname);
 			if (strncmp (dname, "/dev/", 5) == 0) {
 				dname += 5;
 				//printf("tname:%s   dname:%s\n",tname,dname);

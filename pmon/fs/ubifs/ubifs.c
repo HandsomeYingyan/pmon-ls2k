@@ -1074,9 +1074,7 @@ ubifs_open(int fd, const char *path, int flags, int mode)
 	FD=fd;
 	/*  Try to get to the physical device */
 	opath = path;
-	if (strncmp(opath, "/dev/fs/", 8) == 0)
-		opath += 8;
-	else if (strncmp(opath, "/dev/", 5) == 0)
+	if (strncmp(opath, "/dev/", 5) == 0)
 		opath += 5;
 	else
 		return -1;
@@ -1103,7 +1101,7 @@ ubifs_open(int fd, const char *path, int flags, int mode)
 	mtdfile *p;
         LIST_FOREACH(p, &mtdfiles, i_next)
         {
-		if(p->index==mtdx)
+		if(p->mtd->index==mtdx)
 			break;
 	}	
 	if(!p)
@@ -1112,7 +1110,6 @@ ubifs_open(int fd, const char *path, int flags, int mode)
 		return -1;
 	}
 	mt=p->mtd;
-        mt->part = p;
 	if((ubinum=ubi_attach_mtd_dev(mt, 0, 0))<0)
 	{
 		puts("ubi_attach_mtd_dev error!!");
@@ -1126,7 +1123,6 @@ ubifs_open(int fd, const char *path, int flags, int mode)
 	if(ubifs_mount(volname))
 	{
                 puts("ubifs mounted failed!!");
-		ubi_detach_mtd_dev(0, 1);
 		return -1;
 	}
         c = ubifs_sb->s_fs_info;
@@ -1134,14 +1130,6 @@ ubifs_open(int fd, const char *path, int flags, int mode)
         /* ubifs_findfile will resolve symlinks, so we know that we get
          * the real file here */
         //printf("c->vi.ubi_num=%d,c->vi.vol_id=%d,c->vi.vol_size=%d,c->vi.vol_name=%s\n",c->vi.ubi_num,c->vi.vol_id,c->vi.size,c->vi.name);
-	if(!*filename||filename[strlen(filename)-1]=='/')
-	{
-	 ubifs_ls(filename);
-	 ubi_detach_mtd_dev(0, 1); 
-	 ubifs_sb = NULL;
-	return -1;
-	}
-
         inum = ubifs_findfile(ubifs_sb, filename);
         if (!inum) {
 		puts("inum not found");
@@ -1218,22 +1206,11 @@ static FileSystem ubifs = {
         NULL
 };
 
-static FileSystem ubifs1 = {
-        "fs/ubifs", FS_FILE,
-        ubifs_open,
-        ubifs_read,
-        ubifs_write,
-        ubifs_lseek,
-        ubifs_close,
-        NULL
-};
-
 static void init_fs(void) __attribute__ ((constructor));
 
 static void
 init_fs()
 {
         filefs_init(&ubifs);
-        filefs_init(&ubifs1);
 }
 

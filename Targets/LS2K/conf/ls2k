@@ -4,10 +4,6 @@ machine         LS2K        mips    # CPU Architecture, Platform
 config          pmon 
 #option          VGAROM_IN_BIOS
 
-
-option      CONFIG_VIDEO_SPLASH
-option      CONFIG_VIDEO_LOGO_CUISI
-
 option		LOONGSON_2K
 option         	BOOT_PARAM
 option      	VRAM_SIZE=16
@@ -24,11 +20,6 @@ makeoptions	ENDIAN=EL		# Little endian version.
 #
 option		SYSTYPE="\"FCR\""
 option		TARGETNAME="\"FCR\""
-
-#
-# System str options
-#
-option      LS2K_STR
 
 #
 # Platform options
@@ -123,8 +114,8 @@ option		NOPCINAMES		# Save some space for x86emu
 #select		vt82c686        #via686a/b code
 
 select		mod_framebuffer
-option		FB_XSIZE=1024
-option		FB_YSIZE=768
+option		FB_XSIZE=800
+option		FB_YSIZE=480
 select		mod_vesa
 option 		CONFIG_VIDEO_16BPP
 #option 	CONFIG_VIDEO_8BPP_INDEX

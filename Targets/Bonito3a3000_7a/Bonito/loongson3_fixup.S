@@ -112,20 +112,6 @@
 #define HT0_DIV_LOOPC  48
 #define HT0_CORE_DIV   6
 #else
-#ifdef HT0_2200M
-#define HT0_PHY_LO_DIV 2
-#define HT0_PHY_HI_DIV 2
-#define HT0_DIV_REFC   1
-#define HT0_DIV_LOOPC  44
-#define HT0_CORE_DIV   6
-#else
-#ifdef HT0_2000M
-#define HT0_PHY_LO_DIV 2
-#define HT0_PHY_HI_DIV 2
-#define HT0_DIV_REFC   1
-#define HT0_DIV_LOOPC  40
-#define HT0_CORE_DIV   6
-#else
 #ifdef HT0_1800M
 #define HT0_PHY_LO_DIV 2
 #define HT0_PHY_HI_DIV 2
@@ -138,13 +124,6 @@
 #define HT0_PHY_HI_DIV 4
 #define HT0_DIV_REFC   1
 #define HT0_DIV_LOOPC  64
-#define HT0_CORE_DIV   8
-#else
-#ifdef HT0_1400M
-#define HT0_PHY_LO_DIV 4
-#define HT0_PHY_HI_DIV 4
-#define HT0_DIV_REFC   1
-#define HT0_DIV_LOOPC  56
 #define HT0_CORE_DIV   8
 #else
 #ifdef HT0_1200M
@@ -173,9 +152,6 @@
 #define HT0_DIV_REFC   1
 #define HT0_DIV_LOOPC  32
 #define HT0_CORE_DIV   8
-#endif
-#endif
-#endif
 #endif
 #endif
 #endif
@@ -848,22 +824,14 @@ reset_ht0:
 	sd	t0, 0x28(t2)
 	dli	t0, 0x00001c0000000000
 	sd	t0, 0x68(t2)
-#if defined(MULTI_CHIP) && !defined(LS7A_2WAY_CONNECT) && defined(LS7A_1WAY_CLK)
-	dli	t0, 0x00001c00000000f0
-#else
 	dli	t0, 0x00001c00000000f7
-#endif
 	sd	t0, 0xa8(t2)
 
 	dli	t0, 0x0000200000000000
 	sd	t0, 0x30(t2)
 	dli	t0, 0x0000200000000000
 	sd	t0, 0x70(t2)
-#if defined(MULTI_CHIP) && !defined(LS7A_2WAY_CONNECT) && defined(LS7A_1WAY_CLK)
-	dli	t0, 0x00002000000000f0
-#else
 	dli	t0, 0x00002000000000f7
-#endif
 	sd	t0, 0xb0(t2)
 
 	dli	t0, 0x000000fdf8000000

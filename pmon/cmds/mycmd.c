@@ -136,7 +136,7 @@ static union commondata{
 		unsigned int data4;
 		unsigned int data8[2];
 		unsigned char c[8];
-}mydata __attribute__((aligned(8))),*pmydata;
+}mydata,*pmydata;
 
 unsigned int syscall_addrtype=0;
 #define syscall_addrwidth ((syscall_addrtype>256?0:(syscall_addrtype>>4))+1)
@@ -283,7 +283,7 @@ if(argc<3)return -1;
         fp1=open(fdst,O_WRONLY|O_CREAT|O_TRUNC);
 
 
-        if(fp0 < 0||fp1 < 0){printf("open file error!\n");free(buf);return -1;}
+        if(!fp0||!fp1){printf("open file error!\n");free(buf);return -1;}
         if((mtdbs=(test_mtd_or_mtdc(fp0))))
 	  bs = (bs+mtdbs-1)/mtdbs*mtdbs;
 	else if((mtdbs=(test_mtd_or_mtdc(fp1))))
@@ -317,7 +317,6 @@ if(argc<3)return -1;
                     rcount+=n;
                     pnow+=n;
                 }
-		if (!rcount) break;
             nowcount+=rcount;
             if(!(strstr(argv[1],"/dev/tty")||strstr(argv[2],"/dev/tty")||quiet))
             {
@@ -326,18 +325,7 @@ if(argc<3)return -1;
                 sprintf(pstr,"%d",nowcount);
                 printf("%s",pstr);
             }
-	
-            pnow = buf;
-	    while (rcount) {
-		    n = write(fp1, pnow, rcount);
-		    if (n <= 0)
-			    break;
-		    rcount -= n;
-                    pnow += n;
-	    }
-	    
-	    if (n <= 0)
-		    break;
+            if(write(fp1,buf,rcount)<rcount||rcount<bs)break;
         }
         free(buf);
 #if NGZIP > 0
@@ -382,10 +370,8 @@ return -1;
 #define MYASM(...)
 #define MYC(x) x
 #endif
-static int __syscall1(int type,long long a,union commondata *mydata)
+static int __syscall1(int type,long long addr,union commondata *mydata)
 {
-static long long addr;
-addr = a;
 /*
  * use lw to load l[2],will make high bit extension.
  */
@@ -427,10 +413,8 @@ case 8:
 return 0;
 }
 
-static int __syscall2(int type,long long a,union commondata *mydata)
+static int __syscall2(int type,long long addr,union commondata *mydata)
 {
-static long long addr;
-addr = a;
 switch(type)
 {
 case 1:

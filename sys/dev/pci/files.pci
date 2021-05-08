@@ -61,15 +61,6 @@ file sys/dev/pci/igb1/e1000_mbx.c	igb1
 file sys/dev/pci/igb1/e1000_nvm.c	igb1
 file sys/dev/pci/igb1/igb_main.c	igb1
 
-device ngbe: ether, ifnet, ifmedia, mii
-attach ngbe at pci
-file sys/dev/pci/ngbe/ngbe.c	ngbe & !ngbe_linux
-file sys/dev/pci/ngbe-linux/ngbe_main.c	ngbe & ngbe_linux
-
-device txgbe: ether, ifnet, ifmedia, mii
-attach txgbe at pci
-file sys/dev/pci/txgbe/txgbe.c	txgbe
-
 # Ethernet driver for wx-based boards
 device	wx: ether, ifnet, ifmedia, mii, mii_phy
 attach	wx at pci
@@ -171,11 +162,3 @@ file    sys/dev/pci/ahci-sd.c         ahci_sd needs-flag
 device  ahci_cdrom
 attach  ahci_cdrom at ahcibus
 file    sys/dev/pci/ahci-cdrom.c         ahci_cdrom needs-flag
-
-define nvmebus {}
-device pcinvme {[channel = -1]} : nvmebus
-attach pcinvme at pci
-
-device  nvme
-attach  nvme at nvmebus
-file    sys/dev/pci/nvme/nvme.c         pcinvme | nvme needs-flag

@@ -255,3 +255,4 @@ select tftpd
 
 # SCSI RAID disk drive support
 select scsi_sd
+option CONFIG_HT_DMA_RX_ONE_CHANNEL_FOR_MSI

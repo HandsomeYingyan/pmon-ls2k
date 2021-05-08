@@ -25,10 +25,9 @@ option		LSMC_2
 #option		ARB_LEVEL       #use software MC leveling
 option		DDR3_DIMM       #board use DDR3 memory, use: USE_SB_I2C, else use USE_GPIO_I2C and MULTI_I2C_BUS
 
-option		AUTO_DDR_CONFIG #use DIMM SPD auto detect DIMM
+#option		AUTO_DDR_CONFIG #use DIMM SPD auto detect DIMM
 option      USE_LS2H_I2C
 option      LOONGSON_GMAC
-option         	LS3A7A_STR
 
 option		BONITOEL	
 option		DEVBD2F
@@ -286,22 +285,28 @@ option USE_USB_SPI
 option USE_SII9022a
 option USE_CH7034
 #bellow for zxd
-#option DDR_S1="0xc1a10400c1a10400"
-##option DDR_S1="0xc0e18800c0e18800"
-#option REF_33M
-#option DDR_RESET_REVERT=1
-#option DDR_FREQ=500
-#option CORE_FREQ=1200
+option DDR_S1="0xc1a10400c1a10400"
+####option DDR_S1="0xc0e18800c0e18800"
+option REF_33M
+option DDR_RESET_REVERT=1
+option DDR_FREQ=500
+#option CORE_FREQ=1450
+option CORE_FREQ=1200
+option LS7A_LPC_DISABLE=0
 #rmoption AUTO_DDR_CONFIG
-#rmoption USE_USB_SPI
-#rmoption USE_SII9022a
-#rmoption USE_CH7034
+rmoption USE_USB_SPI
+rmoption USE_SII9022a
+rmoption USE_CH7034
 #option VBIOS_IN_ROM
-#option LS3A7A_WDT_GPIO13E_GPIO14F
+##option LS3A7A_WDT_GPIO13E_GPIO14F
+option LS3A_BEEP_GPIO=12
+#option USE_ADV7511
+#option LED_88E151X=0x1477
+#option CPU_GPIO_SET=4
 
 #bellow for hengwei
 #option REF_33M
-#option DDR_FREQ=300
+#option DDR_FREQ=533
 #option CORE_FREQ=1000
 #rmoption USE_SII9022a
 #rmoption USE_CH7034
@@ -309,5 +314,12 @@ option USE_CH7034
 #option LEVELING_CHECK_ALL_BITS
 #option DDR_S1="0xc1e38800c1e38800"
 #rmoption AUTO_DDR_CONFIG
-#option DDR_PARAM_018="0x6262626216100000"
+##option DDR_PARAM_018="0x6262626216100000"
+#option DDR_PARAM_018="0x3030303016100000"
 #option LS7A_LPC_DISABLE=0
+##option		X1024x768
+option MACADDR_NOT_IN_I2CROM
+#option LS7A_GRAPHICS_DISABLE=1
+#option DISABLE_HARD_LEVELING
+option PCIVERBOSE=5
+#option REF_25M

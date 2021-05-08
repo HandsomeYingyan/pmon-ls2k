@@ -56,7 +56,6 @@
 #ifdef LOONGSON_2K
 #include "sdcard.h"
 #endif
-#include "pcinvme.h"
 #include <ahci_sd.h>
 #include <ahci_cdrom.h>
 
@@ -121,12 +120,6 @@ extern int ahci_cdrom_close __P((dev_t dev,int flag, int fmt,struct proc *p));
 extern int ahci_cdrom_read __P((dev_t dev,struct uio *uio,int flags));
 extern int ahci_cdrom_write __P((dev_t dev,struct uio *uio,int flags));
 #endif
-#if NNVME > 0
-int nvme_open(dev_t dev, int flag, int fmt, struct proc *p);
-int nvme_close(dev_t dev, int flag, int fmt, struct proc *p);
-int nvme_read(dev_t dev, struct uio *uio, int flags);
-int nvme_write(dev_t dev, struct uio *uio, int flags);
-#endif
 /*
  * Check for and add any target specific declarations from "pmon_target.h"
  */
@@ -180,9 +173,6 @@ struct devsw devswitch[] = {
 #endif
 #if NSDCARD > 0
 	{ "sdcard", loopdevopen, loopdevread, loopdevwrite, loopdevclose},
-#endif
-#if NNVME > 0
-	{ "nvme", nvme_open, nvme_read, nvme_write, nvme_close },
 #endif
 	/* Add any target specific devices. See "pmon_target.h" */
 #if defined(TGT_DEV_SWITCH)

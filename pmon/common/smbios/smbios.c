@@ -132,10 +132,6 @@ write_smbios_tables(void *start)
        dimmnum = 8;
        maximum_capacity = 64 * 1024 * 1024;
 #endif
-#ifdef LOONGSON_2K
-       dimmnum = 0;
-       maximum_capacity = 0;
-#endif
        do_struct(smbios_type_16_init(p, dimmnum, maximum_capacity));
        for(i = 0; i < dimmnum; i++){
                do_struct(smbios_type_17_init(p, i));
@@ -192,10 +188,6 @@ smbios_entry_point_init(void *start,
 
 static inline int cpu_probe_release(void)
 {
-
-#ifdef LOONGSON3_VIRT
-        return 0;
-#else
        unsigned long cputype_flag = 0;
         __asm__ volatile (
                 ".set     mips3\r\n"
@@ -207,14 +199,10 @@ static inline int cpu_probe_release(void)
                return 1;
         else
                return 0;
-#endif
 }
 /* board_name information */
 static void board_info(char *board_name)
 {
-#ifdef BOARD_NAME
-        strcpy(board_name, BOARD_NAME);
-#else
 #ifdef LOONGSON_3ASINGLE
 	if(cpu_probe_release())
         	strcpy(board_name, "Loongson-3A5-780E-1w-V1.1-demo");
@@ -261,10 +249,7 @@ static void board_info(char *board_name)
         	strcpy(board_name, "Loongson-3A-780E-2w-V1.1-demo");
 #endif
 #endif
-#ifdef LOONGSON_2K
-        strcpy(board_name, LS2K_BOARD_NAME);
-#endif
-#endif
+
 	return ;
 }
 
@@ -356,11 +341,9 @@ static void *
 smbios_type_1_init(void *start)
 {
 	struct smbios_type_1 *p = (struct smbios_type_1 *)start;
-	char product_name[50] = "Loongson-V1.0-demo";
-#if defined(LOONGSON_2G5536)
+	char product_name[50];
+#ifdef LOONGSON_2G5536
 	char *board_family = "Loongson2";
-#elif defined(LOONGSON_2K)
-	char *board_family = "Loongson2K";
 #else
 	char *board_family = "Loongson3";
 #endif
@@ -385,37 +368,7 @@ smbios_type_1_init(void *start)
 	board_info(product_name);
 	prase_name(product_name, loongson_version);
 
-	if (!(q = getenv("uuid")))
-	{
-		char uuid[64];
-		uuid_generate(p->uuid);
-		sprintf(uuid, "%02X%02X%02X%02X-%02X%02X"
-				"-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-				p->uuid[3], p->uuid[2], p->uuid[1], p->uuid[0],
-				p->uuid[5], p->uuid[4], p->uuid[7], p->uuid[6],
-				p->uuid[8], p->uuid[9], p->uuid[10], p->uuid[11],
-				p->uuid[12], p->uuid[13], p->uuid[14], p->uuid[15]);
-		setenv("uuid", uuid);
-	}
-	else {
-		unsigned long long strtoull(const char *nptr,char **endptr,int base);
-		unsigned long long t;
-		unsigned char *pt = &t;
-		char *s, *s1;
-		int i, j;
-		for(i=0, s=q, s1=NULL; i<16; ) {
-			t = strtoull(s, &s1, 16);
-			for(j=0;j < (s1 - s)/2;j++,i++) {
-				if (i < 8)
-					p->uuid[i] =  pt[j];
-				else
-					p->uuid[i] =  pt[(s1 - s)/2 -1 - j];
-			}
-			s = s1+1;
-			if (s1 && *s1) s = s1+1;
-			else break;
-		}
-	}
+	uuid_generate(p->uuid);
 
 	start += sizeof(struct smbios_type_1);
 	strcpy((char *)start, "Loongson");
@@ -532,10 +485,6 @@ smbios_type_4_init(void *start)
 		strcpy(cpu_version, "Loongson ICT Loongson-3B CPU @ 1.5GHz");
 		p->max_speed = 1500;
 	}
-	if(prid == 0x6302){
-		strcpy(cpu_version, "Loongson ICT Loongson-2K CPU @ 1.0GHz");
-		p->max_speed = 1000;
-	}
 
         p->version_str = 2;
         p->voltage  = 0x02;
@@ -570,9 +519,6 @@ smbios_type_4_init(void *start)
 #endif
 #ifdef LOONGSON_2G5536
 	p->core_count = p->core_enable = 1;
-#endif
-#ifdef LOONGSON_2K
-	p->core_count = p->core_enable = 2;
 #endif
         p->thread_count = 0;
         p->processor_characteristics = 0x02;

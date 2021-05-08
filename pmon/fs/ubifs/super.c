@@ -1184,10 +1184,7 @@ int ubifs_mount(char *vol_name)
 	 * First unmount if allready mounted
 	 */
 	if (ubifs_sb)
-	{
 		ubifs_umount(ubifs_sb->s_fs_info);
-		ubifs_sb = NULL;
-	}
 
 	INIT_LIST_HEAD(&ubifs_infos);
 	INIT_LIST_HEAD(&ubifs_fs_type.fs_supers);
@@ -1197,10 +1194,7 @@ int ubifs_mount(char *vol_name)
 	 */
 	flags = MS_RDONLY;
 	//flags=0;
-	if(vol_name[0] != '@')
-		strcat(name, vol_name);
-	else
-		strcpy(name, vol_name + 1);
+	strcat(name, vol_name);
 	data = NULL;
 	mnt = NULL;
 	ret = ubifs_get_sb(&ubifs_fs_type, flags, name, data, mnt);

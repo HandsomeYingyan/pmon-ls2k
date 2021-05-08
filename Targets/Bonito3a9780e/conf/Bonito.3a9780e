@@ -25,7 +25,7 @@ option      LSMC_2
 #option      ARB_LEVEL
 option      DDR3_DIMM
 
-option      AUTO_DDR_CONFIG
+#option      AUTO_DDR_CONFIG
 option      USE_SB_I2C
 
 option		BONITOEL
@@ -45,8 +45,8 @@ option		SHUTDOWN_MASK=0x0000
 #
 # Uart serial baud rate selection
 #
-option      BONITO_33M
-#option      BONITO_25M
+#option      BONITO_33M
+option      BONITO_25M
 #option      BONITO_50M
 
 option  LOONGSON_3ASINGLE
@@ -257,3 +257,4 @@ select scsi_sd
 option PCIVERBOSE=5
 #option X800x600
 option NO_INTERLEAVE
+select spiflash

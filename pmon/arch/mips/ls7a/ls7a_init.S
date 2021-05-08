@@ -6,35 +6,25 @@
 
     dli     t0, LS7A_CONFBUS_BASE_ADDR
 
-    lw      t1, CONF_HT_ROUTE_OFFSET(t0)
-    li      t2, (0xf | (0xf << 16))
-    not     t2, t2
-    and     t1, t1, t2
-
-#ifdef MULTI_CHIP
-    move    t3, zero
 #ifdef  LS7A_2WAY_CONNECT
     // support 2 nodes
     // route node0 dma to 7A HT Lo
     // route node1 dma to 7A HT Hi
-    /*dma_dest_ht set to support 2 node*/
-    li      t3, (0xa << 16)
-#endif
-    ori     t2, t3, 0x1
-#ifdef CHIP_4
-    ori     t2, t3, 0x3
-#endif
+    lw      t1, CONF_HT_ROUTE_OFFSET(t0)
+    li      t2, (0xf | (0xf << 16))
+    not     t2, t2
+    and     t1, t1, t2
+    li      t2, (0x1 | (0xa << 16))
     or      t1, t1, t2
-#endif
-
-#ifdef LS7A_PHYS48_TO_HT40
-    /*support 40 bit DMA device otherwise it lost node id*/
-    and     t1, ~(0xff << 8)
-    or      t1, (0x2 << 8) | (0x6 << 13)
-#endif
-
-    //default support 1 node
     sw      t1, CONF_HT_ROUTE_OFFSET(t0)
+#else
+    // support 1 node
+    lw      t1, CONF_HT_ROUTE_OFFSET(t0)
+    li      t2, (0xf | (0xf << 16))
+    not     t2, t2
+    and     t1, t1, t2
+    sw      t1, CONF_HT_ROUTE_OFFSET(t0)
+#endif
     TTYDBG("config 7A dma route done.\r\n")
 
 #ifndef LS7A_2WAY_CONNECT
@@ -68,13 +58,8 @@
     //gpu, gmem, dc
     daddu   a0, t0, CONF_PLL1_OFFSET
     li      a2, 0x4
-    li      a1, LS7A_PLL_VALUE(127, 8, 6, 12)
-    bal     ls7a_version
-    nop
-    beqz    v0, 1f
-    nop
-    li      a1, LS7A_PLL_VALUE(120, 5, 5, 12)
-1:
+    //li      a1, LS7A_PLL_VALUE(127, 8, 6, 12)
+    li      a1, LS7A_PLL_VALUE(127, 8, 8, 12)
     bal     ls7a_config_one_pll
     nop
     beqz    v0, 1f
@@ -89,12 +74,6 @@
     daddu   a0, t0, CONF_PLL2_OFFSET
     li      a2, 0x4
     li      a1, LS7A_PLL_VALUE(96, 72, 6, 100)
-    bal     ls7a_version
-    nop
-    beqz    v0, 1f
-    nop
-    li      a1, LS7A_PLL_VALUE(96, 72, 4, 100)
-1:
     bal     ls7a_config_one_pll
     nop
     beqz    v0, 1f
@@ -158,21 +137,21 @@
 
     //rewrite HEADER TYPE to Multi-function
     or      a2, $0, 0x80
-    sb      a2, 0x304e(t0) //gmac0
-    sb      a2, 0x308e(t0) //gmac1
+    sb      a2, 0x304e(t0)
+    sb      a2, 0x308e(t0)
 
-    sb      a2, 0x32ce(t0) //sata0
-    sb      a2, 0x330e(t0) //sata1
-    sb      a2, 0x334e(t0) //sata2
+    sb      a2, 0x32ce(t0)
+    sb      a2, 0x330e(t0)
+    sb      a2, 0x334e(t0)
     //fix GPU/DC header
-    li      a2, 0x0400
-    sh      a2, 0x31ca(t0)
-    li      a2, 0x0380
-    sh      a2, 0x320a(t0)
+    li      a2, 0x04000000
+    sw      a2, 0x31c8(t0)
+    li      a2, 0x03800000
+    sw      a2, 0x3208(t0)
 
     //fix LPC header
-    li      a2, 0x0601
-    sh      a2, 0x344a(t0)
+    li      a2, 0x06010000
+    sw      a2, 0x3448(t0)
     li      a2, 0xfc000000
     sw      a2, 0x3460(t0)
     li      a2, 0xfd
@@ -963,22 +942,6 @@ cal_one_pcie_x8:
     li      t2, (1 << 10)
     or      t1, t1, t2
     sw      t1, (CONF_SB_OFFSET+0)(t0)
-
-	//增加usb 驱动能力
-    lw      t1, (0x700)(t0)
-    li      t2, (0x7 << 4) | 0x9
-    or      t1, t1, t2
-    sw      t1, (0x700)(t0)
-
-    lw      t1, (0x704)(t0)
-    li      t2, (0x7 << 4) | 0x9
-    or      t1, t1, t2
-    sw      t1, (0x704)(t0)
-
-    lw      t1, (0x708)(t0)
-    li      t2, (0x7 << 4) | 0x9
-    or      t1, t1, t2
-    sw      t1, (0x708)(t0)
     TTYDBG("USB0 enabled\r\n")
 #else
     //disable clock
@@ -1016,22 +979,6 @@ cal_one_pcie_x8:
     li      t2, (1 << 14)
     or      t1, t1, t2
     sw      t1, (CONF_SB_OFFSET+0)(t0)
-
-	//增加usb 驱动能力
-    lw      t1, (0x710)(t0)
-    li      t2, (0x7 << 4) | 0x9
-    or      t1, t1, t2
-    sw      t1, (0x710)(t0)
-
-    lw      t1, (0x714)(t0)
-    li      t2, (0x7 << 4) | 0x9
-    or      t1, t1, t2
-    sw      t1, (0x714)(t0)
-
-    lw      t1, (0x718)(t0)
-    li      t2, (0x7 << 4) | 0x9
-    or      t1, t1, t2
-    sw      t1, (0x718)(t0)
     TTYDBG("USB1 enabled\r\n")
 #else
     //disable clock
@@ -1071,16 +1018,11 @@ cal_one_pcie_x8:
 
 #if LS7A_GRAPHICS_DISABLE
     lw      t1, 0x420(t0)
-    li      t2, (0x1 << 5)  //TODO, can not disable DC because the PMON assume there it is and as the GPU BAR will affect DC BARs found, so GPU cannot be disabled also
+    li      t2, (0x1 << 5)  //TODO, can not disable DC because the PMON assume there it is and as the GPU BAR will affect DC BAR's found, so GPU cannot be disabled also
     not     t2, t2
     and     t1, t1, t2
     sw      t1, 0x420(t0)
     TTYDBG("Graphics disabled.\r\n")
-#endif
-
-#ifdef LEMOTE_PCIE_PERSTN
-    GPIO_SET_OUTPUT(1 << 4)
-    TTYDBG("Lemote PCIE PERST_N deasserted.\r\n")
 #endif
 
 #define PCIE_TRY_GEN2 1
@@ -1139,13 +1081,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00004800
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 1
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60000000
     sw      a0, 0x10(t3)
 
@@ -1207,13 +1142,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00005000
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 2
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60100000
     sw      a0, 0x10(t3)
 
@@ -1262,13 +1190,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00005800
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 4
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60200000
     sw      a0, 0x10(t3)
 
@@ -1317,13 +1238,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00006000
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 8
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60300000
     sw      a0, 0x10(t3)
 
@@ -1427,13 +1341,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00006800
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 0x10
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60000000
     sw      a0, 0x10(t3)
 
@@ -1494,13 +1401,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00007000
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 0x20
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60100000
     sw      a0, 0x10(t3)
 
@@ -1619,13 +1519,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00009800
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 0x400
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60000000
     sw      a0, 0x10(t3)
 
@@ -1686,13 +1579,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe0000a000
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 0x800
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60100000
     sw      a0, 0x10(t3)
 
@@ -1811,13 +1697,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00007800
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 0x40
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60000000
     sw      a0, 0x10(t3)
 
@@ -1879,13 +1758,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00008000
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 0x80
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60100000
     sw      a0, 0x10(t3)
 
@@ -2004,13 +1876,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00008800
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 0x100
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60000000
     sw      a0, 0x10(t3)
 
@@ -2071,13 +1936,6 @@ cal_one_pcie_x8:
     sw      a1, 0x0(t3)
 
     dli     t3, 0x90000efe00009000
-#if defined(FORCE_PCIE_GEN1) &&  FORCE_PCIE_GEN1 & 0x200
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    a0, 0xa0(t3)
-    or	    a0, 3
-    xor     a0, 2
-    sw      a0, 0xa0(t3)
-#endif
     li      a0, 0x60100000
     sw      a0, 0x10(t3)
 

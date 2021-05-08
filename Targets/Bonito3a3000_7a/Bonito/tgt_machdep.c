@@ -99,7 +99,6 @@ extern int vga_bios_init(void);
 extern int radeon_init(void);
 extern int kbd_initialize(void);
 extern int write_at_cursor(char val);
-extern void hda_codec_set(void);
 extern const char *kbd_error_msgs[];
 #include "flash.h"
 #if (NMOD_FLASH_AMD + NMOD_FLASH_INTEL + NMOD_FLASH_SST) == 0
@@ -122,9 +121,6 @@ extern void *memset(void *, int, size_t);
 extern int usb_spi_init(void);
 #endif
 extern void gmac_mac_init();
-#ifdef SLT
-extern void slt_test();
-#endif
 int kbd_available;
 int bios_available;
 int usb_kbd_available;;
@@ -196,130 +192,9 @@ unsigned int superio_base;
 extern char MipsException[], MipsExceptionEnd[];
 
 unsigned char hwethadr[6];
-static void superio_reinit();
 
-unsigned long long str_ra, str_sp;
-#ifdef LS3A7A_STR
-#define STR_STORE_BASE 0xafaaa000
-
-uint64_t mem_read64(unsigned long addr)
-{
-       unsigned char bytes[8];
-       int i;
-
-       for (i = 0; i < 8; i++)
-               bytes[i] = *((unsigned char *)(STR_STORE_BASE + addr + i));
-
-       return *(uint64_t *) bytes;
-}
-
-void mem_write64(uint64_t data, unsigned long addr)
-{
-       int i;
-       unsigned char *bytes = (unsigned char *) &data;
-
-       for (i = 0; i < 8; i++)
-                *((unsigned char *)(STR_STORE_BASE + addr + i)) = bytes[i];
-}
-
-void check_str()
-{
-       uint64_t str_ra,str_flag, str_ra1,str_flag1;
-       long long str_sp ,str_sp1;
-       unsigned int sp_h,sp_l;
-
-       str_ra = mem_read64(0x40);
-       str_sp = mem_read64(0x48);
-       str_flag = mem_read64(0x50);
-       sp_h = str_sp >> 32;
-       sp_l = str_sp;
-       printf("SP=%llx, RA=%llx\n", str_sp, str_ra);
-       printf("str_flag=%llx\n", str_flag);
-       if ((str_sp < 0x9800000000000000) || (str_ra < 0xffffffff80000000)
-                       || (str_flag != 0x5a5a5a5a5a5a5a5a)) {
-               *(uint64_t *)(STR_STORE_BASE + 0x50) = 0x0; //clean str flag
-               printf("not s3 exit %llx\n", str_flag);
-               return;
-       }
-
-       printf("Start status S3....\n");
-       mem_write64(0x0, 0x40);
-       mem_write64(0x0, 0x48);
-       mem_write64(0x0, 0x50);
-
-       /* misc:0x1008,0000 -- 0x100f,ffff */
-       /* acpi offset 0x50000 of misc */
-       /* 0x50 of acpi is cmos reg which storage s3 flag, now clear this flag */
-    *((unsigned int *)(0xb00d0050)) = 0x0;
-
-       ls_pcie_interrupt_fixup();
-
-       printf("CPU TLBClear....\n");
-       CPU_TLBClear();
-       printf("CPU TLBInit....\n");
-       CPU_TLBInit();
-       printf("CPU FlushCache....\n");
-       CPU_FlushCache();
-
-       printf("jump to kernel....\n");
-       __asm__ __volatile__(
-                       ".set   noat                    \n"
-                       ".set   mips64                  \n"
-                       "move   $t0, %0                 \n"
-                       "move   $t1, %1                 \n"
-                       "dli    $t2, 0x00000000ffffffff \n"
-                       "and    $t1,$t2                 \n"
-                       "dsll   $t0,32                  \n"
-                       "or     $sp, $t0,$t1            \n"
-                       "jr     %2                      \n"
-                       "nop                            \n"
-                       ".set   at                      \n"
-                       : /* No outputs */
-                       :"r"(sp_h), "r"(sp_l),"r"(str_ra)
-                       );
-}
-#endif
-
-extern char waitforinit[];
 void initmips(unsigned int raw_memsz)
 {
-	//core1-3 run waitdorinit function in ram
-#ifdef		MULTI_CHIP
-	asm volatile(
-	".set push;\n"
-	".set noreorder\n"
-        ".set mips64;\n"
-	"dli $2,0x900010003ff01000;\n"
-	"dli $3, 4;\n"
-        "1:sd %0,0x20($2);"
-	"daddiu $2,0x100;\n"
-	"addiu $3,-1;\n"
-	"bnez $3, 1b;\n"
-	"nop;\n"
-	".set reorder;\n"
-        ".set mips0;\n"
-	".set pop;\n"
-         ::"r"(&waitforinit):"$2","$3");
-#endif
-	asm volatile(
-	".set push;\n"
-	".set noreorder\n"
-        ".set mips64;\n"
-	"dli $2,0x900000003ff01100;\n"
-	"dli $3, 3;\n"
-        "1:sd %0,0x20($2);"
-	"daddiu $2,0x100;\n"
-	"addiu $3,-1;\n"
-	"bnez $3, 1b;\n"
-	"nop;\n"
-	".set reorder;\n"
-        ".set mips0;\n"
-	".set pop;\n"
-         ::"r"(&waitforinit):"$2","$3");
-
-	//disable 3a spi instruction fetch
-	__raw__writeq(0x900000003ff00080ULL, 0x1fc00082ULL);
-
     tgt_fpuenable();
 
     get_memorysize(raw_memsz);
@@ -516,6 +391,9 @@ void tgt_devconfig()
 		}
 	}
 #endif
+
+	kbd_initialize();
+	kbd_available=1;
 #endif
 #if defined(VESAFB)
 	SBD_DISPLAY("VESA", 0);
@@ -532,12 +410,6 @@ void tgt_devconfig()
 			ScreenLineLength = 1600;
 			ScreenDepth = 16;
 			ScreenHeight = 600;
-#if 0
-			//this parameters for 1920*1080 VGA
-			ScreenLineLength = 3840;
-			ScreenDepth = 16;
-			ScreenHeight = 1080;
-#endif
 		} else {
 			fbaddress  = _pci_conf_read(pcie_dev->pa.pa_tag,0x10);
 			fbaddress = fbaddress &0xffffff00; //laster 8 bit
@@ -583,20 +455,10 @@ void tgt_devconfig()
 	configure();
 	gmac_mac_init();
 
-#if defined(LS7A_LPC_DISABLE) && !LS7A_LPC_DISABLE
-	if(getenv("nokbd"))
-		rc=1;
-	else {
-		rc=kbd_initialize();
-	}
-	printf("%s\n",kbd_error_msgs[rc]);
-	if(!rc){
-		kbd_available=1;
-	}
-#endif
 #ifdef INTERFACE_3A780E 
 
 	vga_available = 1;
+    kbd_available = 0;
     bios_available = 1; //support usb_kbd in bios
 	// Ask user whether to set bios menu
     printf("Press <Del> to set BIOS,waiting for 3 seconds here..... \n");
@@ -679,6 +541,7 @@ bios:
 run:
 		vga_available = 1;
 		bios_available = 0;//support usb_kbd in bios
+		//kbd_available = 1;
 
 		len = strlen(bootup);
 		for (ic = 0; ic < len; ic++)
@@ -690,55 +553,6 @@ run:
 	printf("devconfig done.\n");
 	clear_pcie_inter_irq();
 	ls_pcie_interrupt_fixup();
-	hda_codec_set();
-#ifdef SLT
-	slt_test();
-#endif
-}
-static int w83627_read(int dev,int addr)
-{
-	int data;
-	/*enter*/
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0x87);
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0x87);
-	/*select logic dev reg */
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0x7);
-	outb(BONITO_PCIIO_BASE_VA + 0x002f,dev);
-	/*access reg */
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,addr);
-	data=inb(BONITO_PCIIO_BASE_VA + 0x002f);
-	/*exit*/
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0xaa);
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0xaa);
-	return data;
-}
-
-static void w83627_write(int dev,int addr,int data)
-{
-	/*enter*/
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0x87);
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0x87);
-	/*select logic dev reg */
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0x7);
-	outb(BONITO_PCIIO_BASE_VA + 0x002f,dev);
-	/*access reg */
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,addr);
-	outb(BONITO_PCIIO_BASE_VA + 0x002f,data);
-	/*exit*/
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0xaa);
-	outb(BONITO_PCIIO_BASE_VA + 0x002e,0xaa);
-}
-static void superio_reinit()
-{
-	w83627_write(0,0x24,0xc1);
-	w83627_write(5,0x30,1);
-	w83627_write(5,0x60,0);
-	w83627_write(5,0x61,0x60);
-	w83627_write(5,0x62,0);
-	w83627_write(5,0x63,0x64);
-	w83627_write(5,0x70,1);
-	w83627_write(5,0x72,0xc);
-	w83627_write(5,0xf0,0x80);
 }
 
 void tgt_devinit()
@@ -885,7 +699,6 @@ static void _probe_frequencies()
 
 	SBD_DISPLAY ("FREI", CHKPNT_FREQ);
 
-#ifdef USE_RTC_COUNTER
 	/*
 	 * Do the next twice for two reasons. First make sure we run from
 	 * cache. Second make sure synched on second update. (Pun intended!)
@@ -923,101 +736,6 @@ static void _probe_frequencies()
 		md_cpufreq = 66000000;
 	}
 	tgt_printf("cpu freq %u\n", md_pipefreq);
-
-#else
-/*
- //whd: use to check the read delay
-		cnt = CPU_GetCOUNT();
-	for(i = 0; i != 100; i++) {
-		inl(LS7A_TOY_READ0_REG);
-	}
-		cnt = CPU_GetCOUNT() - cnt;
-
-	tgt_printf("100 read RTC delay %u\n", cnt);
-
-		cnt = CPU_GetCOUNT();
-	for(i = 0; i != 100; i++) {
-		inl(0xBA000000);
-	}
-		cnt = CPU_GetCOUNT() - cnt;
-
-	tgt_printf("100 read HT header delay %u\n", cnt);
-
-		cnt = CPU_GetCOUNT();
-	for(i = 0; i != 100; i++) {
-		inl(0xBA001000);
-	}
-		cnt = CPU_GetCOUNT() - cnt;
-
-	tgt_printf("100 read RTC header delay %u\n", cnt);
-
-		cnt = CPU_GetCOUNT();
-	for(i = 0; i != 100; i++) {
-		inl(0xB00A0004);
-	}
-		cnt = CPU_GetCOUNT() - cnt;
-
-	tgt_printf("100 read PWM header delay %u\n", cnt);
-
-		cnt = CPU_GetCOUNT();
-	for(i = 0; i != 100; i++) {
-		inl(0xB00010f0);
-	}
-		cnt = CPU_GetCOUNT() - cnt;
-
-	tgt_printf("100 read HPET header delay %u\n", cnt);
-*/
-
-/* whd : USE HPET to calculate the frequency, 
- *       reduce the booting delay and improve the frequency accuracy. 
- *       when use the RTC counter of 7A, it cost 160us+ for one read, 
- *       but if we use the HPET counter, it only cost ~300ns for one read,
- *       so the HPET has good accuracy even use less time */
-
-	outl(LS7A_HPET_CONF, 0x1);//Enable main clock
-
-	/*
-	 * Do the next twice to make sure we run from cache
-	 */
-	for (i = 2; i != 0; i--) {
-		timeout = 10000000;
-
-		sec = inl(LS7A_HPET_MAIN);//get time now
-		cnt = CPU_GetCOUNT();
-		cur = (inl(LS7A_HPET_PERIOD) / 1000000);
-		sec = sec + (100000000 / cur);//go 100 ms
-		do {
-			timeout--;
-			cur = (inl(LS7A_HPET_MAIN));
-		} while (timeout != 0 && (cur < sec));
-
-		cnt = CPU_GetCOUNT() - cnt;
-		if (timeout == 0) {
-			tgt_printf("time out!\n");
-			break;	/* Get out if clock is not running */
-		}
-	}
-
-	/*
-	 *  Calculate the external bus clock frequency.
-	 */
-	if (timeout != 0) {
-		clk_invalid = 0;
-		md_pipefreq = cnt / 1000;
-
-		if((cnt % 1000) >= 500)//to make rounding
-			md_pipefreq = md_pipefreq + 1;
-
-		md_pipefreq *= 20000;
-		/* we have no simple way to read multiplier value
-		 */
-		md_cpufreq = 66000000;
-	}
-		cur = (inl(LS7A_HPET_PERIOD) / 1000000);
-	tgt_printf("cpu freq %u, cnt %u\n", md_pipefreq, cnt);
-
-	outl(LS7A_HPET_CONF, 0x0);//Disable main clock
-#endif
 #endif /* HAVE_TOD */
 }
 /*
@@ -1666,143 +1384,96 @@ void clear_pcie_inter_irq(void)
         }
 }
 
-int ls7a_get_irq(unsigned char dev, int fn)
-{
-	int irq;
-	switch(dev)
-	{
-		default:
-		case 2:
-		/*APB 2*/
-		irq = 0;
-		break;
-
-		case 3:
-		/*GMAC0 3 0*/
-		/*GMAC1 3 1*/
-		irq = (fn == 0) ? 12 : 14;
-		break;
-
-		case 4:
-		/* ohci:4 0 */
-		/* ehci:4 1 */
-		irq = (fn == 0) ? 49 : 48;
-		break;
-
-		case 5:
-		/* ohci:5 0 */
-		/* ehci:5 1 */
-		irq = (fn == 0) ? 51 : 50;
-		break;
-
-		case 6:
-		/* DC: 6 1 28 */
-		/* GPU:6 0 29 */
-		irq = (fn == 0) ? 29 : 28;
-		break;
-
-		case 7:
-		/*HDA: 7 0 58 */
-		irq = 58;
-		break;
-
-		case 8:
-		/* sata */
-		if (fn == 0)
-			irq = 16;
-		if (fn == 1)
-			irq = 17;
-		if (fn == 2)
-			irq = 18;
-		break;
-
-		case 9:
-		/* pcie_f0 port0 */
-		irq = 32;
-		break;
-
-		case 10:
-		/* pcie_f0 port1 */
-		irq = 33;
-		break;
-
-		case 11:
-		/* pcie_f0 port2 */
-		irq = 34;
-		break;
-
-		case 12:
-		/* pcie_f0 port3 */
-		irq = 35;
-		break;
-
-		case 13:
-		/* pcie_f1 port0 */
-		irq = 36;
-		break;
-
-		case 14:
-		/* pcie_f1 port1 */
-		irq = 37;
-		break;
-
-		case 15:
-		/* pcie_g0 port0 */
-		irq = 40;
-		break;
-
-		case 16:
-		/* pcie_g0 port1 */
-		irq = 41;
-		break;
-
-		case 17:
-		/* pcie_g1 port0 */
-		irq = 42;
-		break;
-
-		case 18:
-		/* pcie_g1 port1 */
-		irq = 43;
-		break;
-
-		case 19:
-		/* pcie_h port0 */
-		irq = 38;
-		break;
-
-		case 20:
-		/* pcie_h port1 */
-		irq = 39;
-		break;
-	}
-	return irq + 64;
-}
-
 void ls_pcie_interrupt_fixup(void)
 {
 
-	extern struct pci_device *_pci_head;
-	extern int pci_roots;
+	unsigned int dev;
+	unsigned int val;
+	unsigned int base = 64;
+    unsigned char i;
+	/*GMAC0*/
+	dev = _pci_make_tag(0, 3, 0);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff) // device on the slot
+        _pci_conf_write8(dev, 0x3c, base + 12);
 
-	unsigned int tag;
-	unsigned char i, irq;
-	struct pci_device *pd,*pdd,*pddd;
+	/*GMAC1*/
+	dev = _pci_make_tag(0, 3, 1);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff)
+		_pci_conf_write8(dev, 0x3c, base + 14);
 
-	for (i = 0, pd = _pci_head; i < pci_roots; i++, pd = pd->next) {
-		for (pdd = pd->bridge.child; pdd != NULL; pdd = pdd->next) {
-			//printf("- bus %d device %d function %d\n", pdd->pa.pa_bus, pdd->pa.pa_device, pdd->pa.pa_function);
-			tag = _pci_make_tag(pdd->pa.pa_bus, pdd->pa.pa_device, pdd->pa.pa_function);
-			irq = ls7a_get_irq(pdd->pa.pa_device,pdd->pa.pa_function);
-			_pci_conf_write8(tag, 0x3c, irq);
-			//printf("irq -> %d\n", 0xff & _pci_conf_read(tag, 0x3c));
-			for (pddd = pdd->bridge.child; pddd != NULL; pddd = pddd->next) {
-				//printf("- bus %d device %d function %d\n", pddd->pa.pa_bus, pddd->pa.pa_device, pddd->pa.pa_function);
-				tag = _pci_make_tag(pddd->pa.pa_bus, pddd->pa.pa_device, pddd->pa.pa_function);
-				_pci_conf_write8(tag, 0x3c, irq);
-				//printf("irq -> %d\n", 0xff & _pci_conf_read(tag, 0x3c));
-			}
-		}
+	/*EHCI*/
+	dev = _pci_make_tag(0, 4, 1);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff) // device on the slot
+		_pci_conf_write8(dev, 0x3c, base + 48);
+
+	/*OHCI*/
+	dev = _pci_make_tag(0, 4, 0);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff) // device on the slot
+		_pci_conf_write8(dev, 0x3c, base + 49);
+
+	/*EHCI*/
+	dev = _pci_make_tag(0, 5, 1);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff) // device on the slot
+		_pci_conf_write8(dev, 0x3c, base + 50);
+
+	/*OHCI*/
+	dev = _pci_make_tag(0, 5, 0);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff) // device on the slot
+		_pci_conf_write8(dev, 0x3c, base + 41);
+
+	/*GPU*/
+	dev = _pci_make_tag(0, 6, 0);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff) // device on the slot
+		_pci_conf_write8(dev, 0x3c, base + 29);
+
+	/*DC*/
+	dev = _pci_make_tag(0, 6, 1);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff) // device on the slot
+		_pci_conf_write8(dev, 0x3c, base + 28);
+
+	/*HDA*/
+	dev = _pci_make_tag(0, 7, 0);
+	val = _pci_conf_read(dev, 0x00);
+	if ( val != 0xffffffff) // device on the slot
+		_pci_conf_write8(dev, 0x3c, base + 58);
+
+	/*SATA*/
+	for(i = 0;i < 3;i++) {
+		dev = _pci_make_tag(0, 8, i);
+		val = _pci_conf_read(dev, 0x00);
+		if ( val != 0xffffffff) // device on the slot
+			_pci_conf_write8(dev, 0x3c, base + 16 + i);
+	}
+
+	/*PCIE*/
+    /*PCIE F0/F1*/
+	for(i = 0;i < 6;i++) {
+		dev = _pci_make_tag(0, 9 + i, 0);
+		val = _pci_conf_read(dev, 0x00);
+		if ( val != 0xffffffff) // device on the slot
+			_pci_conf_write8(dev, 0x3c, base + 32 + i);
+	}
+    /*PCIE G0/G1*/
+	for(i = 0;i < 4;i++) {
+		dev = _pci_make_tag(0, 15 + i, 0);
+		val = _pci_conf_read(dev, 0x00);
+		if ( val != 0xffffffff) // device on the slot
+			_pci_conf_write8(dev, 0x3c, base + 40 + i);
+	}
+    /*PCIE H*/
+	for(i = 0;i < 2;i++) {
+		dev = _pci_make_tag(0, 19 + i, 0);
+		val = _pci_conf_read(dev, 0x00);
+		if ( val != 0xffffffff) // device on the slot
+			_pci_conf_write8(dev, 0x3c, base + 38 + i);
 	}
 }
 

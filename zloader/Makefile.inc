@@ -55,7 +55,7 @@ ifdef obj
 export CC += -g3
 pwd=$(shell pwd)
 gcc_E:
-	cd ../Targets/${TARGET}/compile/${TARGETEL};${pwd}/mymake  ${obj}
+	cd ../Targets/${TARGET}/compile/${TARGETEL};${pwd}/mymake  ${obj} > /tmp/tmp.c
 endif
 
 ifndef tgt
@@ -72,11 +72,11 @@ sim: clean pmon.bin.c
 	gcc -o zloader  -DSIM zloader.c
 ejtag_rom ejtag_rom1 ejtag_ram rom: clean ${START} zloader.o 
 	gcc  -DSTARTADDR=${GZROMSTARTADDR} -DOUT_FORMAT=\"${OUT_FORMAT}\" -DOUT_ARCH=mips -Umips -E -P ld.script.S  > ld.script
-	${LD} -T ld.script -g -e start -o gzrom ${START} zloader.o 
+	${LD} -T ld.script -e start -o gzrom ${START} zloader.o 
 	${CROSS_COMPILE}objcopy -O binary gzrom gzrom.bin
 
 ram: clean startram.o zloader.o 
-	${CC}  -DSTARTADDR=${GZROMSTARTADDR} -DOUT_FORMAT=\"${OUT_FORMAT}\" -DOUT_ARCH=mips -Umips -E -P ld.script.S  > ld.script
+	${CC}  -DSTARTADDR=${RAMSTARTADDR} -DOUT_FORMAT=\"${OUT_FORMAT}\" -DOUT_ARCH=mips -Umips -E -P ld.script.S  > ld.script
 	${LD}  -T ld.script -e start -o gzram startram.o zloader.o 
 
 ${START}:
@@ -86,7 +86,7 @@ ${START}:
 	cp ../Targets/${TARGET}/compile/${TARGETEL}/${START} .
 
 startram.o:
-	gcc  -DSTARTADDR=${ROMSTARTADDR} -DOUT_FORMAT=\"${OUT_FORMAT}\" -DOUT_ARCH=mips -Umips -E -P ld.script.S  > ../Targets/${TARGET}/conf/ld.script
+	gcc  -DSTARTADDR=${RAMSTARTADDR} -DOUT_FORMAT=\"${OUT_FORMAT}\" -DOUT_ARCH=mips -Umips -E -P ld.script.S  > ../Targets/${TARGET}/conf/ld.script
 	make -C ../Targets/${TARGET}/compile/${TARGETEL}/ DEBUG='-g -DMYDBG="printf(\"debug:%s,%d\\n\",__FILE__,__LINE__);"'
 	$(CC) -D_LOCORE -G 0  -nostdinc   -DMIPS  -DCONS_BAUD="B115200"  -DCONFIG_CACHE_64K_4WAY  -D_KERNEL -D__OpenBSD__ -DPMON -D__PMON__ -mno-abicalls -c startram.S ${ZLOADER_OPTIONS} -D MEMSIZE=${MEMSIZE}
 # $(CC) -D_LOCORE -G 0  -nostdinc   -DMIPS  -DCONS_BAUD="B115200"  -DCONFIG_CACHE_64K_4WAY  -D_KERNEL -D__OpenBSD__ -DPMON -D__PMON__ -EL -mno-abicalls -mcpu=r4000 -c startram.S -D MEMSIZE=${MEMSIZE}
@@ -143,9 +143,9 @@ gencode=./genram
 endif
 
 dtb:
-	make -C ../Targets/${TARGET}/compile/${TARGETEL}/ DTB_O=`pwd`/${TARGETEL}.dtb.i DTB_I=`pwd`/../Targets/${TARGET}/conf/${TARGETEL}.dts dtb
-	./dtc -I dts -O dtb -o ${TARGETEL}.dtb  ${TARGETEL}.dtb.i
-	[ -f gzrom.bin ] && cp gzrom.bin gzrom-dtb.bin && python ../tools/pmonenv.py -f gzrom-dtb.bin -d ${TARGETEL}.dtb -w  al=\(usb0,0\)/boot/vmlinuz al1=\(wd0,0\)/boot/vmlinuz append="'console=ttyS0,115200 console=tty initcall_debug=1 loglevel=20'" FR=1
+	make -C ../Targets/${TARGET}/compile/${TARGETEL}/ DTB_O=`pwd`/${TARGET}.dtb.i DTB_I=`pwd`/../Targets/${TARGET}/conf/${TARGET}.dts dtb
+	./dtc -I dts -O dtb -o ${TARGET}.dtb  ${TARGET}.dtb.i
+	[ -f gzrom.bin ] && cp gzrom.bin gzrom-dtb.bin && python ../tools/pmonenv.py -f gzrom-dtb.bin -d ${TARGET}.dtb -w  al=\(usb0,0\)/boot/vmlinuz al1=\(wd0,0\)/boot/vmlinuz append="'console=ttyS0,115200 console=tty initcall_debug=1 loglevel=20'" FR=1
 cleanall: clean
 	make -C ../Targets/${TARGET}/compile/${TARGETEL}/ clean
 clean:

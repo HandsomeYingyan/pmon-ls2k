@@ -257,3 +257,4 @@ select tftpd
 # SCSI RAID disk drive support
 select scsi_sd
 select timer_irq
+#option NO_INTERLEAVE

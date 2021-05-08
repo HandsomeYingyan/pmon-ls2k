@@ -643,7 +643,7 @@ int
  *  Verify flash contents to ram contents.
  */
 int
-fl_verify_device(void *fl_base, void *data_base, int data_size, int verbose)
+ __attribute__((weak)) fl_verify_device(void *fl_base, void *data_base, int data_size, int verbose)
 {
 	struct fl_map *map;
 	struct fl_device *dev;
