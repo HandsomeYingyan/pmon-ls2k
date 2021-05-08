@@ -4,8 +4,8 @@
 #
 
 file	Targets/LS2K/pci/pci_machdep.c
-file	Targets/LS2K/ls2k/tgt_machdep.c
-file	Targets/LS2K/ls2k/dc.c
+file	Targets/LS2K/ls2k/tgt_machdep.c 
+file	Targets/LS2K/ls2k/dc.c 
 file	Targets/LS2K/pci/ls2k_pci.c
 
 
@@ -13,16 +13,13 @@ define  localbus { [base = -1 ] }
 device  localbus
 attach  localbus at mainbus
 file    Targets/LS2K/dev/localbus.c		localbus
-file    Targets/LS2K/dev/spi_w.c
-file	Targets/LS2K/dev/nand_opt.c
+file    Targets/LS2K/dev/spi_w.c		
+file	Targets/LS2K/dev/nand_opt.c               
 file	Targets/LS2K/dev/set_cpu_ddr_freq.c
 file	Targets/LS2K/dev/set_vol.c
 file	Targets/LS2K/dev/rtc.c
 file	Targets/LS2K/dev/eeprom.c
-file	Targets/LS2K/dev/setmac.c
 file	Targets/LS2K/dev/load_dtb.c		cmd_dtb
-file	Targets/LS2K/dev/signal_test.c
-file    Targets/LS2K/dev/slt.c
 
 # OHCI
 #device	lohci {[channel = -1]} :usbbus
@@ -40,6 +37,7 @@ file	sys/dev/nand/m25p80.c m25p80 & nand needs-flag
 file	Targets/LS2K/dev/i2c.c i2c
 file	Targets/LS2K/dev/9022a.c sii9022a needs-flag
 file	Targets/LS2K/dev/can_test.c can
+file	Targets/LS2K/dev/pai2.c 
 
 
 device	syn: ether, ifnet

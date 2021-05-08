@@ -3,7 +3,23 @@
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/nppbreg.h>
+#ifdef PCI_PROBE_ONLY
 int pci_probe_only = 2; /*0:nothing, 1:dtb pci use pmon allcated, kernel pci probe only, 2: dtb pci use pmon allocated,kernel pci reassigned.*/
+#else
+int pci_probe_only = 0;
+#endif
+
+static char vbios[128] = 
+{
+ 0x5a, 0xaa, 0x55, 0x11, 0x22, 0x33, 0x44, 0x55, 0xcc, 0xee, 0x11, 0xcc, 0xcc, 0xee, 0x55, 0xaa,
+ 0x5a, 0xaa, 0x55, 0x11, 0x22, 0x33, 0x44, 0x55, 0xcc, 0xee, 0x11, 0xcc, 0xcc, 0xee, 0x55, 0xaa,
+ 0x5a, 0xaa, 0x55, 0x11, 0x22, 0x33, 0x44, 0x55, 0xcc, 0xee, 0x11, 0xcc, 0xcc, 0xee, 0x55, 0xaa,
+ 0x5a, 0xaa, 0x55, 0x11, 0x22, 0x33, 0x44, 0x55, 0xcc, 0xee, 0x11, 0xcc, 0xcc, 0xee, 0x55, 0xaa,
+ 0x5a, 0xaa, 0x55, 0x11, 0x22, 0x33, 0x44, 0x55, 0xcc, 0xee, 0x11, 0xcc, 0xcc, 0xee, 0x55, 0xaa,
+ 0x5a, 0xaa, 0x55, 0x11, 0x22, 0x33, 0x44, 0x55, 0xcc, 0xee, 0x11, 0xcc, 0xcc, 0xee, 0x55, 0xaa,
+ 0x5a, 0xaa, 0x55, 0x11, 0x22, 0x33, 0x44, 0x55, 0xcc, 0xee, 0x11, 0xcc, 0xcc, 0xee, 0x55, 0xaa,
+ 0x5a, 0xaa, 0x55, 0x11, 0x22, 0x33, 0x44, 0x55, 0xcc, 0xee, 0x11, 0xcc, 0xcc, 0xee, 0x55, 0xaa
+};
 
 static int check_mem_args(const void * ssp);
 static int update_mem_args(const void * ssp);
@@ -49,20 +65,8 @@ static int check_mac_ok(void)
 			return 1;	//no mac prop in ethernet, do nothing
 		}
 	
-#ifdef USE_ENVMAC
-		if (USE_ENVMAC)
-		{
-			tgt_ethaddr(mac_addr);
-			mac_addr[5] += id;
-		}
-		else
-		{
-			memcpy( mac_addr, nodep, 6);
-		}
-#else
 		i2c_init();//configure the i2c freq
 		mac_read(id * 6, mac_addr, 6);
-#endif
 		for(i = 0;i < 6;i++) {
 			if(mac_addr[i] != (*((char *)nodep + i) & 0xff)) {
 				printf("mac_eeprom[%d]=0x%x; mac_dtb[%d]=0x%x; reset mac addr in dtb\n", \
@@ -102,7 +106,7 @@ static int check_pci_bridge_ok(void)
 	
 		/*pci foarmat(name/len) is flag/1 pciaddr/2 cpuaddr/1 len/2*/
 		tag = _pci_make_tag(0, dev, 0);
-	        val = _pci_conf_read32(tag, 0x00);
+	        val = _pci_conf_read32(dev, 0x00);
 		if ( val != 0xffffffff){
 		val =_pci_conf_read32(tag, 0x20);
 		start = (val & 0xfff0) << 16;
@@ -126,7 +130,7 @@ static int check_pci_bridge_ok(void)
 		}
 		else
 		{
-		 if(data[5] != cpu_to_be32(0x100000) || data[6+5] != cpu_to_be32(0x1000))
+		 if(data[5] != 0 || data[6+5] != 0)
 			return 0;
 		}
 	}
@@ -226,6 +230,7 @@ static int update_mac(void * ssp, int id)
 	u8 mac_addr[6] = {0x00, 0x55, 0x7B, 0xB5, 0x7D, 0xF7};	//default mac address
 	char ethernet_name[2][25]={"/soc/ethernet@0x40040000", "/soc/ethernet@0x40050000"};
 
+//	printf("update_mac\n");
 	nodeoffset = fdt_path_offset (ssp, ethernet_name[id]);
 	if (nodeoffset < 0) {
 		printf ("libfdt fdt_path_offset() returned %s\n", fdt_strerror(nodeoffset));
@@ -237,20 +242,8 @@ static int update_mac(void * ssp, int id)
 		return -1;
 	}
 
-#ifdef USE_ENVMAC
-	if (USE_ENVMAC)
-	{
-		tgt_ethaddr(mac_addr);
-		mac_addr[5] += id;
-	}
-	else
-	{
-		memcpy( mac_addr, nodep, 6);
-	}
-#else
 	i2c_init();//configure the i2c freq
 	mac_read(id * 6, mac_addr, 6);
-#endif
 	len = 6;
 	if(fdt_setprop(ssp, nodeoffset, "mac-address", mac_addr, len)) {
 		printf("Update mac-address%d error\n", id);
@@ -258,6 +251,34 @@ static int update_mac(void * ssp, int id)
 	}
 	return 0;
 }
+
+#if 0
+static int update_vbios(void * ssp)
+{
+	int nodeoffset, len;
+	void *nodep;	/* property node pointer */
+
+	char vbios_name[]={"/soc/gpu@0x40080000"};
+
+	printf("update_vbios\n");
+	nodeoffset = fdt_path_offset (ssp, vbios_name[0]);
+	if (nodeoffset < 0) {
+		printf ("libfdt fdt_path_offset() returned %s\n", fdt_strerror(nodeoffset));
+		return -1;
+	}
+	
+	printf("aaa\n");
+	len = 128;
+	if(fdt_setprop(ssp, nodeoffset, "pmon-vbios", vbios, len)) {
+		printf("Update pmon-vbios error\n");
+		return -1;
+	}
+	return 0;
+}
+
+#endif
+
+
 
 static int update_prop_flag(void * ssp, char *propname, int wanted)
 {
@@ -315,6 +336,7 @@ void verify_dtb(void)
 		update_prop_flag(buff + 4, "pci-probe-only", pci_probe_only == 1);
 		update_mac(buff + 4, 0);
 		update_mac(buff + 4, 1);
+	//	update_vbios(buff + 4);
 		update_pci_bridge(buff + 4);
 		update_mem_args(buff + 4);
 		dtb_cksum(buff, DTB_SIZE - 4, 1);
@@ -420,48 +442,6 @@ static int fdt_parse_prop(char * const *newval, int count, char *data, int *len)
 }
 
 extern struct pci_device *pcie_dev;
-static int set_mem_xbar()
-{
-	static int configured;
-	int i;
-	if (configured)
-		return 0;
-
-	/*
-	   map highmem to 2G to support dma32
-	   0xbfe10020 is old higmem window.
-	   0xbfe10018 is a free window, use it remap highmem window to 2G.
-	 */
-	for(i=0xbfe10018;i!=0xbfe10040;i+=8) {
-		/* Already configured */
-		if (*(volatile long long *)i == 0x80000000ULL)
-			break;
-
-		if (*(volatile long long *)(i+0x80) == 0)  {
-			*(volatile long long *)i = 0x80000000ULL;
-			*(volatile long long *)(i+0x40) = *(volatile long long *)0xbfe10060|0xffffffff80000000ULL;
-			*(volatile long long *)(i+0x80) = *(volatile long long *)0xbfe100a0;
-			break;
-		}
-	}
-
-	/* The same applied to uncached */
-	for(i=0xbfe10118;i!=0xbfe10140;i+=8) {
-		/* Already configured */
-		if (*(volatile long long *)i == 0x80000000ULL)
-			break;
-
-		if (*(volatile long long *)(i+0x80) == 0)  {
-			*(volatile long long *)i = 0x80000000ULL;
-			*(volatile long long *)(i+0x40) = *(volatile long long *)0xbfe10060|0xffffffff80000000ULL;
-			*(volatile long long *)(i+0x80) = *(volatile long long *)0xbfe100a0;
-			break;
-		}
-	}
-	configured = 1;
-	return 0;
-}
-
 static int check_mem_args(const void * ssp)
 {
 	int nodeoffset, len, j;
@@ -481,7 +461,7 @@ static int check_mem_args(const void * ssp)
 		 */
 		printf ("libfdt fdt_path_offset() returned %s\n", fdt_strerror(nodeoffset));
 		printf("can not find memory in dtb, abort!!!\n");
-		return 1;
+		goto abort;
 	}
 	p = nodep = fdt_getprop (ssp, nodeoffset, (const char* )"reg", &len);
 	if(len <= 0) {
@@ -489,34 +469,21 @@ static int check_mem_args(const void * ssp)
 		return 1;
 	}
 
+	if (len != 8*4) {
+		goto abort;
+	}
+
 	v = fdt32_to_cpu(p[4]);
 	v1 = fdt32_to_cpu(p[5]);
+	if((v != 1 && v1 != 0x10000000) && (v != 0 && v1 != 0x90000000))
+	goto abort;
 	max_mem -= 0x10000000;
-	if (v == 0 && v1 == 0x90000000)
-		set_mem_xbar();
-	if (len == 12*4 && v == 0 && v1 == 0x90000000 && max_mem > 0x70000000) {
-		max_mem -= 0x70000000;
-		v= max_mem;
-		v1 = max_mem >> 32;
-		return (p[6] == cpu_to_fdt32(0) && \
-		p[7] == cpu_to_fdt32(0x70000000) && \
-		p[8] == cpu_to_fdt32(1) && \
-		p[9] == cpu_to_fdt32(0x80000000) && \
-		p[10] == cpu_to_fdt32(v1) && \
-		p[11] == cpu_to_fdt32(v));
-	}
-	else if (len == 8*4 && v == 0 && v1 == 0x90000000) {
-		v= cpu_to_fdt32((u32)max_mem);
-		v1 =cpu_to_fdt32 ((u32)(max_mem >> 32));
-		return (p[6] == v1 && p[7] == v);
-	}
-	else if (len == 8*4 && v == 1 && v1 == 0x10000000) {
-		v= cpu_to_fdt32((u32)max_mem);
-		v1 =cpu_to_fdt32 ((u32)(max_mem >> 32));
-		return (p[6] == v1 && p[7] == v);
-	}
-	else
-		return 1;
+	v= cpu_to_fdt32((u32)max_mem);
+	v1 =cpu_to_fdt32 ((u32)(max_mem >> 32));
+	if(p[6] != v1 && p[7] != v)
+	  return 0;
+abort:
+	return 1;
 }
 
 static int update_mem_args(const void * ssp)
@@ -555,27 +522,13 @@ static int update_mem_args(const void * ssp)
 	if((v != 1 && v1 != 0x10000000) && (v != 0 && v1 != 0x90000000))
 	goto abort;
 	max_mem -= 0x10000000;
-	if (v == 0 && v1 == 0x90000000)
-		set_mem_xbar();
-	if (v == 0 && v1 == 0x90000000 && max_mem > 0x70000000) {
-		max_mem -= 0x70000000;
-		v= max_mem;
-		v1 = max_mem >> 32;
-		data[6] = cpu_to_fdt32(0);
-		data[7] = cpu_to_fdt32(0x70000000);
-		data[8] = cpu_to_fdt32(1);
-		data[9] = cpu_to_fdt32(0x80000000);
-		data[10] = cpu_to_fdt32(v1);
-		data[11] = cpu_to_fdt32(v);
-		len = 12*4;
-	} else {
-		v= max_mem;
-		v1 = max_mem >> 32;
-		data[6] = cpu_to_fdt32(v1);
-		data[7] = cpu_to_fdt32(v);
-		len = 8*4;
-	}
-	if (fdt_setprop(ssp, nodeoffset, "reg", data, len)) {
+	v= max_mem;
+	v1 = max_mem >> 32;
+	data[6] = cpu_to_fdt32(v1);
+	data[7] = cpu_to_fdt32(v);
+	
+	if (fdt_setprop(ssp, nodeoffset, "reg", data, 8*4))
+	{
 		printf("set reg error\n");
 		goto abort;
 	}
@@ -1118,7 +1071,7 @@ warning:
 	printf("set_dtb <path> <prop> [value]\n");
 	printf("eg: set_dtb /chosen bootargs \"console=ttyS0,115200 root=/dev/sda1\"\n");
 	printf("eg: set_dtb /memory reg <0 0x00200000 0 0x09e00000 1 0x10000000 1 0xd0000000>\n");
-	printf("eg: set_dtb /soc/ethernet@0x40040000 mac-address [80 c1 80 c1 80 c1]\n");
+	printf("eg: set_dtb /soc/ethernet@0x40000000 mac-address [80 c1 80 c1 80 c1]\n");
 	return 0;
 }
 
@@ -1234,7 +1187,7 @@ int show_fdt_cmds(int argc,char **argv)
 	printf("\tset_dtb <path> <prop> [value]\n");
 	printf("\teg: set_dtb /chosen bootargs \"console=ttyS0,115200 root=/dev/sda1\"\n");
 	printf("\teg: set_dtb /memory reg <0 0x00200000 0 0x09e00000 1 0x10000000 1 0xd0000000>\n");
-	printf("\teg: set_dtb /soc/ethernet@0x40040000 mac-address [80 c1 80 c1 80 c1]\n\n");
+	printf("\teg: set_dtb /soc/ethernet@0x40000000 mac-address [80 c1 80 c1 80 c1]\n\n");
 
 	printf("print_dtb		- Print dtb\n");
 	printf("\tprint_dtb <path> [prop]\n");

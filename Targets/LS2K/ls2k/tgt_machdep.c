@@ -186,11 +186,8 @@ extern unsigned long long memorysize_high;
 
 extern char MipsException[], MipsExceptionEnd[];
 
-unsigned char hwethadr[12];
+unsigned char hwethadr[6];
 unsigned char ls2kver;
-#ifdef LOWPOWER
-unsigned int shutdev;
-#endif
 
 void initmips(unsigned long long  raw_memsz);
 
@@ -202,20 +199,15 @@ pcireg_t _pci_allocate_io(struct pci_device *dev, vm_size_t size);
 static void superio_reinit();
 extern char wait_for_smp_call[];
 extern char ls2k_version();
-#ifdef SLT
-extern void slt_test();
-#endif
 
 #define DPMCFG (*(volatile int *)0xbfe07400)
 #define DPMCTR (*(volatile int *)0xbfe07408)
-#define PCIE0PHY (*(volatile int *)0xbfe10588)
 #define PCIE1PHY (*(volatile int *)0xbfe105a8)
 #define GENCFG (*(volatile int *)0xbfe10430)
 #define FREQSCALE1 (*(volatile int *)0xbfe104d4)
 enum gencfg
 {
 GENCFG_RESEGPU = 1,
-GENCFG_PCI0EN = (1<<16),
 GENCFG_PCI1EN = (1<<17),
 };
 
@@ -224,9 +216,6 @@ enum freqscale1
 FREQSCALE1_CORE1EN = 2,
 };
 
-#ifdef DEBUG_BY_EJTAG
-#include "ejtag.c"
-#endif
 
 void initmips(unsigned long long  raw_memsz)
 {
@@ -239,9 +228,6 @@ void initmips(unsigned long long  raw_memsz)
 	*(volatile int *)0xbfe10428 |= 0xe;
 #endif
 
-#ifdef DEBUG_BY_EJTAG
-	ejtag_init();
-#endif
 	tgt_fpuenable();
 
 	get_memorysize(raw_memsz);
@@ -251,80 +237,20 @@ void initmips(unsigned long long  raw_memsz)
 //	CPU_TLBClear();
 
 #ifdef LOWPOWER
-#define SHUT_DC 1
-#define SHUT_GPU 2
-#define SHUT_PCIE0 4
-#define SHUT_PCIE1 8
-#define SHUT_GMAC0 0x10
-#define SHUT_GMAC1 0x20
-#define SHUT_VPU 0x40
-#define SHUT_CAM 0x80
-#define SHUT_SATA 0x10000
-	memcpy(&shutdev ,(char *)0xbfc00000 + NVRAM_OFFS + SHUTDEV_OFFS, 4);
-	if ((shutdev>>24) !=  0x5a) shutdev = 0;
-	else shutdev &= 0xffffff;
-	if (shutdev) {
-		if (shutdev & SHUT_DC) {
-			//#shutdev dc
-			DPMCTR = (DPMCTR&~3)|1;
-			DPMCFG |= 1;
-		}
-		if (shutdev & SHUT_GPU) {
-			//#shutdev gpu
-			GENCFG |= GENCFG_RESEGPU;
-			DPMCTR = (DPMCTR&~0xc)|4;
-			DPMCFG |= 2;
-		}
-		//#shutdevdown core1
-		//FREQSCALE1 &= ~FREQSCALE1_CORE1EN;
-		if (shutdev & SHUT_PCIE0) {
-			//#pcie0 low power
-			GENCFG &= ~GENCFG_PCI0EN;
-			PCIE0PHY |= (1<<24);
-			PCIE0PHY &= ~(0xf<<20);
-			//#shutdev pcie 0
-			DPMCTR = (DPMCTR&~0x30)|0x10;
-			DPMCFG |= 4;
-		}
-		if (shutdev & SHUT_PCIE1) {
-			//#pcie1 low power
-			GENCFG &= ~GENCFG_PCI1EN;
-			PCIE1PHY |= (1<<24);
-			PCIE1PHY &= ~(0xf<<20);
-			//#shutdev pcie 1
-			DPMCTR = (DPMCTR&~0xc0)|0x40;
-			DPMCFG |= 8;
-		}
-		if (shutdev & SHUT_SATA) {
-			//#pcie1 low power
-			//#shutdev shut
-			DPMCTR = (DPMCTR&~0x300)|0x100;
-			DPMCFG |= 0x10;
-		}
-		if (shutdev & SHUT_GMAC0) {
-			//#shutdev gmac0
-			DPMCTR = (DPMCTR&~0xc00)|0x400;
-			DPMCFG |= 0x20;
-		}
-		if (shutdev & SHUT_GMAC1) {
-			//#shutdev gmac1
-			DPMCTR = (DPMCTR&~0x3000)|0x1000;
-			DPMCFG |= 0x40;
-		}
-		if (shutdev & SHUT_VPU) {
-			//#shutdev vpu
-			*(volatile int *)0xbfe10430 |= 1<<20;
-		}
-		if (shutdev & SHUT_CAM) {
-			//#shutdev cam
-			*(volatile int *)0xbfe10430 |= 1<<19;
-		}
-	}
-#endif
-#ifdef LS2K_SELLIO
-	*(volatile int *)0xbfe10424 |= (1<<31);
-	*(volatile int *)0xbfe10424 &= ~((1<<29)|(1<<23));
-	*(volatile int *)0xbfe104d0 &= ~(0x700);
+//#shut dc
+DPMCTR = (DPMCTR&~3)|1;
+DPMCFG |= 1;
+//#shut gpu
+GENCFG |= GENCFG_RESEGPU;
+DPMCTR = (DPMCTR&~0xc)|4;
+DPMCFG |= 2;
+//#shutdown core1
+//FREQSCALE1 &= ~FREQSCALE1_CORE1EN;
+//#pcie1 low power
+GENCFG &= ~GENCFG_PCI1EN;
+PCIE1PHY |= (1<<24);
+DPMCTR = (DPMCTR&~0xc0)|0x40;
+DPMCFG |= 0x8;
 #endif
 
 	/*
@@ -335,18 +261,24 @@ void initmips(unsigned long long  raw_memsz)
 	ls2k_i2c_init(0, 0xbfe01000+1*0x800);
 	tgt_cpufreq();
 	SBD_DISPLAY("DONE", 0);
-
-	cpuinfotab[0] = &DBGREG;
 	/*
 	 *  Init PMON and debug
 	 */
 	CPU_ConfigCache();
 
-	dbginit(NULL);
+	cpuinfotab[0] = &DBGREG;
+
+	SBD_DISPLAY("BEV1", 0);
+	bcopy(MipsException, (char *)XTLB_MISS_EXC_VEC,
+	      MipsExceptionEnd - MipsException);
+	bcopy(MipsException, (char *)GEN_EXC_VEC,
+	      MipsExceptionEnd - MipsException);
+
 
 #ifndef ROM_EXCEPTION
 	CPU_SetSR(0, SR_BOOT_EXC_VEC);
 #endif
+	dbginit(NULL);
 	{
 		int spi_read_area(int flashaddr, char *buffer, int size);
 		int spi_write_area(int flashaddr,char *buffer,int size);
@@ -355,22 +287,14 @@ void initmips(unsigned long long  raw_memsz)
 		newsym ("spi_write", (unsigned long) spi_write_area);
 		newsym ("spi_erase", (unsigned long) spi_erase_area);
 	}
+
 	/*
 	 *  Set up exception vectors.
 	 */
-	SBD_DISPLAY("BEV1", 0);
-	bcopy(MipsException, (char *)XTLB_MISS_EXC_VEC,
-			MipsExceptionEnd - MipsException);
-	bcopy(MipsException, (char *)GEN_EXC_VEC,
-			MipsExceptionEnd - MipsException);
 	SBD_DISPLAY("BEV0", 0);
 	printf("BEV in SR set to zero.\n");
 	/*disable spi instruct fetch before enter spi io mode*/
-#ifdef DEBUG_BY_EJTAG
-	*(volatile int *)0xbfe10080 = 0x001000f0;
-#else
 	*(volatile int *)0xbfe10080 = 0x1fc00082;
-#endif
 #if NNAND
 #ifdef CONFIG_LS2K_NAND
 	*(volatile int *)0xbfe10420 |= (1<<9) ;
@@ -386,16 +310,10 @@ void initmips(unsigned long long  raw_memsz)
 	ls2h_m25p_probe();
 #endif
 #endif
-#ifndef GPIO_PINS
  /*set pwm1,2 to gpio, gpio21, gpio22 to 1*/
  *(volatile int *)0xbfe10420 &= ~(0x6<<12);
  *(volatile int *)0xbfe10500 &= ~(0x3<<21);
  *(volatile int *)0xbfe10510 |= 0x3<<21;
-/*config otg phy increase gate volt check 4.5%*/
-#endif
-*(volatile int *)0xbfe10440 = 0x1a3a0df9;
-/*otg vbus*/
-//*(volatile int *)0xc0000000 |= 6;
 #ifdef DTB
 	if(!getenv("oldpmon"))
 		verify_dtb();
@@ -407,8 +325,6 @@ void initmips(unsigned long long  raw_memsz)
 	main();
 }
 
-#define STR_STORE_BASE 0xafaaa000
-#define PM_REG_BASE    0xbfe07000
 /*
  *  Put all machine dependent initialization here. This call
  *  is done after console has been initialized so it's safe
@@ -422,63 +338,40 @@ extern int fb_init(unsigned long, unsigned long);
 extern int dc_init();
 
 
-#define PCICFG5_RECFG	0xbfe13830 /*GPU*/
-#define PCICFG6_RECFG	0xbfe13838 /*DC*/
-
-static void disable_igpu(void)
-{
-	unsigned int dev;
-
-	// GPU Tag
-	dev = _pci_make_tag(0, 5, 0);
-	// Disable decoding
-	_pci_conf_write32(dev, 0x4, 0x0);
-	// Mask Device (VID DID 0xffff)
-	inl(PCICFG5_RECFG) |= 0xf;
-	_pci_conf_write32(dev, 0, 0xffffffff);
-	inl(PCICFG5_RECFG) &= 0xfffffff0;
-
-	// DC Tag
-	dev = _pci_make_tag(0, 6, 0);
-	// Disable decoding
-	_pci_conf_write32(dev, 0x4, 0x0);
-	// Mask Device (VID DID 0xffff)
-	inl(PCICFG6_RECFG) |= 0xf;
-	_pci_conf_write32(dev, 0, 0xffffffff);
-	inl(PCICFG6_RECFG) &= 0xfffffff0;
-
-	// Power down DC
-	DPMCTR = (DPMCTR&~3)|1;
-	DPMCFG |= 1;
-
-	// Power down GPU
-	GENCFG |= GENCFG_RESEGPU;
-	DPMCTR = (DPMCTR&~0xc)|4;
-	DPMCFG |= 2;
-}
-
-static void init_pcidev(void)
+void tgt_devconfig()
 {
 	unsigned int val;
+#if NMOD_VGACON > 0
+	int rc = 1;
 #if NMOD_FRAMEBUFFER > 0
 	unsigned long fbaddress, ioaddress;
 	extern struct pci_device *pcie_dev;
-	extern unsigned long long  lfb_addr;
-	int rc = 0;
 #endif
-
+#endif 
 	*(volatile unsigned int *)0xbfe10428 &= ~(1<<19); /*disable usb prefetch*/
 	val = *(unsigned int *)0xbfe10420;
 	*(unsigned int *)0xbfe10420 = (val | 0xc000);//mtf, enable I2C1
-#ifdef ENABLE_ALL_SERIAL
-	*(volatile int *)0xbfe10428 |= 0x3fff; 
+#ifdef UART0_ENABLE
+	*(volatile int *)0xbfe10428 |= 0xf; 
 #endif
-
-#if NSII9022A
-	config_sii9022a();
+#ifdef UART1_ENABLE
+	*(volatile int *)0xbfe10428 |= (1<<12); 
+	*(volatile int *)0xbfe10428 &= ~(1<<7); 
+	*(volatile int *)0xbfe10430 &= ~(1<<1); 
+	*(volatile int *)0xbfe10428 |= (0xf<<4); 
+#endif
+#ifdef UART2_ENABLE
+	*(volatile int *)0xbfe10428 |= (1<<13); 
+	*(volatile int *)0xbfe10428 &= ~(1<<7); 
+	*(volatile int *)0xbfe10430 &= ~(1<<1); 
+	*(volatile int *)0xbfe10428 |= (0xf<<8); 
 #endif
 
 	_pci_devinit(1);	/* PCI device initialization */
+#ifdef PAI2
+	pai2_init();
+#endif
+
 #if (NMOD_X86EMU_INT10 > 0)||(NMOD_X86EMU >0)
 	if(pcie_dev != NULL){
 		SBD_DISPLAY("VGAI", 0);
@@ -487,44 +380,35 @@ static void init_pcidev(void)
 #endif
 #if NMOD_FRAMEBUFFER > 0
 	if (rc > 0) {
-		// Optimus allows multiple VGA in system
-		if (!getenv("optimus")) {
-			printf("dGPU init success, disabling iGPU for non-optimus\n");
-			disable_igpu();
+		if(pcie_dev == NULL){
+			printf("begin fb_init\n");
+			fbaddress = dc_init();
+			printf("dc_init done\n");
+			//this parameters for 1280*1024 VGA
+		} else {
+			fbaddress  = _pci_conf_read(pcie_dev->pa.pa_tag,0x10);
+			fbaddress = fbaddress &0xffffff00; //laster 8 bit
+			fbaddress |= 0x80000000;
 		}
-
-		fbaddress = lfb_addr;
-	} else {
-		printf("dGPU VGA BIOS init failed, rc=%d\n",rc);
-		printf("Switch to iGPU\n");
-		printf("begin fb_init\n");
-		/*
-		 * Note: For encoder chip (e.g. sii9022), we should initilize them earlier
-		 * as they need time to establish link with monitor.
-		 */
-		fbaddress = dc_init();
-		printf("dc_init done\n");
-	}
-
-	if (fbaddress) {
 		printf("fbaddress = %08x\n", fbaddress);
 		fb_init(fbaddress, 0);
 		printf("fb_init done\n");
+	} else {
+		printf("vga bios init failed, rc=%d\n",rc);
+	}
+#if NSII9022A
+	config_sii9022a();
+#endif
+#endif
+
+
+#if (NMOD_FRAMEBUFFER > 0)
+	if (rc > 0)
 		if (!getenv("novga"))
 			vga_available = 1;
 		else
 			vga_available = 0;
-	}
 #endif
-
-	return;
-}
-
-void tgt_devconfig()
-{
-
-	/* Enable pci device and init VGA device */
-	init_pcidev();
 	/*
 	 * if found syn1,then set io multiplexing
 	 * gmac1 use UART0,UART1
@@ -550,8 +434,7 @@ void tgt_devconfig()
 	unsigned int val;
 
 	dev = _pci_make_tag(0, FPGA_ON_BUS0_DEV, 0);
-	val = _pci_conf_readn(dev, 0x10, 4) & ~0xf;
-	val |= (val&0x10000000)?0xa0000000:0xc0000000;
+	val = (_pci_conf_readn(dev, 0x10, 4) & ~0xf)|0xc0000000;
 
 	//PCIE_TD_ATTR default 0x1c, can change to 0x18, 0x4 etc, according fpga packet's td and attr seting.
 	*(volatile int *)(val + 0x58) = (*(volatile int *)(val + 0x58) & ~0x1c)|FPGA_PCIE_TD_ATTR;
@@ -572,83 +455,9 @@ void tgt_devconfig()
 	}
 	psaux_init();
 #endif
-#ifdef SLT
-	slt_test();
-#endif
+/*pcie bus setup for fpga*/
 	printf("devconfig done.\n");
 
-}
-
-uint64_t cmos_read64(unsigned long addr)
-{
-	unsigned char bytes[8];
-	int i;
-
-	for (i = 0; i < 8; i++)
-		bytes[i] = *((unsigned char *)(STR_STORE_BASE + addr + i));
-	return *(uint64_t *) bytes;
-}
-
-void cmos_write64(uint64_t data, unsigned long addr)
-{
-	int i;
-	unsigned char *bytes = (unsigned char *) &data;
-
-	for (i = 0; i < 8; i++)
-		*((unsigned char *)(STR_STORE_BASE + addr + i)) = bytes[i];
-}
-
-void check_str()
-{
-	uint64_t s3_ra,s3_flag;
-	long long s3_sp;
-	unsigned int sp_h,sp_l;
-	unsigned int gpe0_stat;
-
-	s3_ra = cmos_read64(0x40);
-	s3_sp = cmos_read64(0x48);
-	s3_flag = cmos_read64(0x50);
-
-	sp_h = s3_sp >> 32;
-	sp_l = s3_sp;
-
-	if ((s3_sp < 0x9800000000000000) || (s3_ra < 0xffffffff80000000)
-			|| (s3_flag != 0x5a5a5a5a5a5a5a5a)) {
-		printf("S3 status no exit %llx\n", s3_flag);
-		return;
-	}
-	/* clean s3 wake flag */
-	cmos_write64(0x0, 0x40);
-	cmos_write64(0x0, 0x48);
-	cmos_write64(0x0, 0x50);
-
-	/*clean s3 wake status*/
-	gpe0_stat = *(volatile unsigned int *)(PM_REG_BASE + 0x28);
-	gpe0_stat |= 0xfff0;
-	*(volatile unsigned int *)(PM_REG_BASE + 0x28) = gpe0_stat;
-
-	/* Enable pci device and init VGA device */
-	init_pcidev();
-
-	/* fixup pcie config */
-	ls_pcie_config_set();
-
-	/* jump to kernel... */
-	__asm__ __volatile__(
-			".set   noat            \n"
-			".set   mips64          \n"
-			"move   $t0, %0         \n"
-			"move   $t1, %1         \n"
-			"dli    $t2, 0x00000000ffffffff \n"
-			"and    $t1,$t2         \n"
-			"dsll   $t0,32          \n"
-			"or $sp, $t0,$t1        \n"
-			"jr %2          \n"
-			"nop                \n"
-			".set   at          \n"
-			: /* No outputs */
-			:"r"(sp_h), "r"(sp_l),"r"(s3_ra)
-			);
 }
 
 extern int test_icache_1(short *addr);
@@ -735,13 +544,8 @@ void tgt_reboot()//mtf
 
 void tgt_poweroff()//mtf
 {
-#ifdef LS2K_NO_ACPI
-	/* Poweroff = reboot on no-ACPI systems */
-	*(volatile unsigned int *)0xbfe07030 = 1;
-#else
 	*(volatile unsigned int *)0xbfe0700c &= 0xffffffff;
 	*(volatile unsigned int *)0xbfe07014 = 0x3c00;
-#endif
 }
 
 /*
@@ -803,7 +607,8 @@ void tgt_logo()
 	printf("[[  [[[[[[[[  [[[[[[ [[[  [[[[[[ [[[  [[[  [  [[[  [[[[[  [[[[[[[[[[  [[[  [[[[[[ [[[  [[[  [  [[\n");
 	printf("[[  [[[[[[[[   [[[[  [[[   [[[[  [[[  [[[[    [[[   [[[[  [[[   [[[  [[[[   [[[[  [[[  [[[[    [[\n");
 	printf("[[       [[[[       [[[[[       [[[[  [[[[[   [[[[       [[[[[      [[[[[[       [[[[  [[[[[   [[\n");
-	printf("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[2011 Loongson][[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\n");   
+	printf("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[2021 HandsomeMod][[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[\n");   
+	printf("[[[[[[[[[[[[[[[[[[[[[[[[[Hacked by HandsomeYingyan<handsomeyingyan@gmail.com>[[[[[[[[[[[[[[[[[[[[\n");
 }
 
 static void init_legacy_rtc(void)
@@ -843,11 +648,6 @@ extern int rtc_set_time(unsigned char *);
 extern int rtc_get_sec(void);
 #endif
 
-#define LS2K_HPET_BASE 		0xbfe04000
-#define LS2K_HPET_PERIOD	LS2K_HPET_BASE + 0x4
-#define LS2K_HPET_CONF		LS2K_HPET_BASE + 0x10 
-#define LS2K_HPET_MAIN		LS2K_HPET_BASE + 0xF0 
-
 static void _probe_frequencies()
 {
 #ifdef HAVE_TOD
@@ -861,57 +661,6 @@ static void _probe_frequencies()
 
 	clk_invalid = 1;
 #ifdef HAVE_TOD
-#ifdef HPET_RTC
-/* whd : USE HPET to calculate the frequency, 
- *       reduce the booting delay and improve the frequency accuracy. 
- *       when use the RTC counter of 7A, it cost 160us+ for one read, 
- *       but if we use the HPET counter, it only cost ~300ns for one read,
- *       so the HPET has good accuracy even use less time */
-
-	outl(LS2K_HPET_CONF, 0x1);//Enable main clock
-
-	/*
-	 * Do the next twice to make sure we run from cache
-	 */
-	for (i = 2; i != 0; i--) {
-		timeout = 10000000;
-
-		sec = inl(LS2K_HPET_MAIN);//get time now
-		cnt = CPU_GetCOUNT();
-		cur = (inl(LS2K_HPET_PERIOD) / 1000000);
-		sec = sec + (100000000 / cur);//go 100 ms
-		do {
-			timeout--;
-			cur = (inl(LS2K_HPET_MAIN));
-		} while (timeout != 0 && (cur < sec));
-
-		cnt = CPU_GetCOUNT() - cnt;
-		if (timeout == 0) {
-			tgt_printf("time out!\n");
-			break;	/* Get out if clock is not running */
-		}
-	}
-
-	/*
-	 *  Calculate the external bus clock frequency.
-	 */
-	if (timeout != 0) {
-		clk_invalid = 0;
-		md_pipefreq = cnt / 1000;
-
-		if((cnt % 1000) >= 500)//to make rounding
-			md_pipefreq = md_pipefreq + 1;
-
-		md_pipefreq *= 20000;
-		/* we have no simple way to read multiplier value
-		 */
-		md_cpufreq = 66000000;
-	}
-		cur = (inl(LS2K_HPET_PERIOD) / 1000000);
-	tgt_printf("cpu freq %u, cnt %u\n", md_pipefreq, cnt);
-
-	outl(LS2K_HPET_CONF, 0x0);//Disable main clock
-#else
 #ifdef EXTERNAL_RTC
 	for (i = 2; i != 0; i--) {
 		timeout = 10000000;
@@ -977,7 +726,6 @@ static void _probe_frequencies()
 		md_cpufreq = 66000000;
 	}
 	tgt_printf("cpu freq %u\n", md_pipefreq);
-#endif
 #else
 	md_pipefreq = read_cpufreq()*1000000;
 #endif /* HAVE_TOD */
@@ -1058,7 +806,7 @@ time_t tgt_gettime()
 		tm.tm_min = buf[1];
 		tm.tm_hour = buf[2];
 		tm.tm_mday = buf[4];
-		tm.tm_mon = buf[5]-1;
+		tm.tm_mon = buf[5];
 		tm.tm_year = buf[6];
 		if (tm.tm_year < 50)
 			tm.tm_year += 100;
@@ -1105,8 +853,6 @@ void tgt_settime(time_t t)
 	buf[2] = tm->tm_hour;
 	buf[4] = tm->tm_mday;
 	buf[5] = (tm->tm_mon + 1);
-	 if(tm->tm_year > 100)
-		 tm->tm_year -=100;
 	buf[6] = tm->tm_year;
 
 	rtc_set_time(buf);
@@ -1160,8 +906,7 @@ void tgt_machprint()
 
 register_t tgt_clienttos()
 {
-	extern char start[];
-	return(register_t)(int)PHYS_TO_CACHED(start - 64);
+	return ((register_t) (int)PHYS_TO_UNCACHED(memorysize & ~7) - 64);
 }
 
 #ifdef HAVE_FLASH
@@ -1367,22 +1112,15 @@ void tgt_mapenv(int (*func) __P((char *, char *)))
 	 *  six bytes of nvram storage. Set environment to it.
 	 */
 
-	bcopy(&nvram[ETHER_OFFS], hwethadr, 12);
+	bcopy(&nvram[ETHER_OFFS], hwethadr, 6);
 	sprintf(env, "%02x:%02x:%02x:%02x:%02x:%02x", hwethadr[0], hwethadr[1],
 		hwethadr[2], hwethadr[3], hwethadr[4], hwethadr[5]);
 	(*func) ("ethaddr", env);
-	sprintf(env, "%02x:%02x:%02x:%02x:%02x:%02x", hwethadr[6], hwethadr[7],
-		hwethadr[8], hwethadr[9], hwethadr[10], hwethadr[11]);
-	(*func) ("ethaddr1", env);
-	ls2kver = nvram[VER_OFFS] ^ 0x50;
+	ls2kver = nvram[VER_OFFS];
 	if(ls2kver>1)
 	   ls2kver = ls2k_version();
 	sprintf(env, "%d", ls2kver);
 	(*func) ("ls2kver", env);
-#ifdef LOWPOWER
-	sprintf(env, "0x%x", shutdev);
-	(*func) ("shutdev", env);
-#endif
 
 #ifndef NVRAM_IN_FLASH
 	free(nvram);
@@ -1766,32 +1504,16 @@ int tgt_setenv(char *name, char *value)
 		ddrfreq = 1024;
 	  bcopy(&ddrfreq, &nvramsecbuf[DDRFREQ_OFFS], 2);
 	}
-#ifdef LOWPOWER
-	else if(strcmp("shutdev", name) == 0)
-	{
-	  shutdev = strtoul(value, 0, 0)|0x5a000000;
-	  bcopy(&shutdev, &nvramsecbuf[SHUTDEV_OFFS], 4);
-	}
-#endif
 	else if(strcmp("ls2kver", name) == 0)
 	{
 	  ls2kver = strtoul(value, 0, 0);
 	}
-	else if (strcmp("ethaddr", name) == 0) {
+	else
+	if (strcmp("ethaddr", name) == 0) {
 		char *s = value;
 		int i;
 		int32_t v;
 		for (i = 0; i < 6; i++) {
-			gethex(&v, s, 2);
-			hwethadr[i] = v;
-			s += 3;	/* Don't get to fancy here :-) */
-		}
-	}
-	else if (strcmp("ethaddr1", name) == 0) {
-		char *s = value;
-		int i;
-		int32_t v;
-		for (i = 6; i < 12; i++) {
 			gethex(&v, s, 2);
 			hwethadr[i] = v;
 			s += 3;	/* Don't get to fancy here :-) */
@@ -1846,8 +1568,8 @@ int tgt_setenv(char *name, char *value)
 	bcopy(&activecom, &nvrambuf[ACTIVECOM_OFFS], 1);
 	bcopy(&em_enable, &nvrambuf[MASTER_BRIDGE_OFFS], 1);
 #endif
-	bcopy(hwethadr, &nvramsecbuf[ETHER_OFFS], 12);
-	nvramsecbuf[VER_OFFS] = ls2kver | 0x50;
+	bcopy(hwethadr, &nvramsecbuf[ETHER_OFFS], 6);
+	nvramsecbuf[VER_OFFS] = ls2kver;
 #ifdef NVRAM_IN_FLASH
 
 #ifdef BOOT_FROM_NAND
@@ -2174,6 +1896,7 @@ u64 __raw__writeq(u64 addr, u64 val);
 void ls_pcie_config_set(void)
 {
 	int i;
+	if(getenv("oldpmon")) return;
 
 	for(i = 0;i < ARRAY_SIZE(pci_config_array);i++){
 			//ls_pcie_mem_fixup(pci_config_array + i);
@@ -2189,33 +1912,7 @@ void ls_pcie_config_set(void)
 	{
 		/*set dc coherent*/
 		*(volatile int *)0xbfe10430 |= 8; 
-
-		if(!getenv("oldpmon")) //FIXME: OldPMON GPU VUMA Mapping?
-			map_gpu_addr();
-	}
-
-	/*
-	map highmem to 2G to support dma32
-	0xbfe10020 is old higmem window.
-	0xbfe10018 is a free window, use it remap highmem window to 2G.
-	*/
-	for(i=0xbfe10018;i!=0xbfe10040;i+=8) {
-		if (*(volatile long long *)(i+0x80) == 0)  {
-			*(volatile long long *)i = 0x80000000ULL;
-			*(volatile long long *)(i+0x40) = *(volatile long long *)0xbfe10060|0xffffffff80000000ULL;
-			*(volatile long long *)(i+0x80) = *(volatile long long *)0xbfe100a0;
-			break;
-		}
-	}
-
-	/* The same applied to uncached */
-	for(i=0xbfe10118;i!=0xbfe10140;i+=8) {
-		if (*(volatile long long *)(i+0x80) == 0)  {
-			*(volatile long long *)i = 0x80000000ULL;
-			*(volatile long long *)(i+0x40) = *(volatile long long *)0xbfe10060|0xffffffff80000000ULL;
-			*(volatile long long *)(i+0x80) = *(volatile long long *)0xbfe100a0;
-			break;
-		}
+		map_gpu_addr();
 	}
 }
 
@@ -2348,10 +2045,8 @@ void ls_pcie_interrupt_fixup(struct pci_config_data *pdata)
 	dev = _pci_make_tag(pdata->bus, pdata->dev, pdata->func);
 	val = _pci_conf_read32(dev, 0x00);
 	/*	device on the slot	*/
-	if (val != 0xffffffff) {
+	if ( val != 0xffffffff)
 			_pci_conf_write16(dev, 0x3c, pdata->interrupt|0x100);
-			_pci_conf_write8(dev, 0x3d, 0x1);
-	}
 
 	//mask the unused device
 #if 0
@@ -2403,11 +2098,12 @@ extern unsigned long long memorysize_high;
 #include "../../../pmon/cmds/bootparam.h"
 struct efi_memory_map_loongson * init_memory_map()
 {
-
+#if 0
 	struct efi_memory_map_loongson *emap = &g_map;
-	unsigned long long high_size = atoi(getenv("highmemsize")); // MB!
 	int i = 0;
+	unsigned long long size = memorysize_high;
 
+	emap->nr_map = 7;
 	emap->mem_freq = 266000000; //266Mhz
 #define EMAP_ENTRY(entry, node, type, start, size) \
 	emap->map[(entry)].node_id = (node), \
@@ -2416,24 +2112,45 @@ struct efi_memory_map_loongson * init_memory_map()
 	emap->map[(entry)].mem_size = (size), \
 	(entry)++
 
-	/* PMON reserved low 0x0000_0000 ~ 0x0020_0000, 0x1f00_0000 ~ 0x2000_0000  */
-	EMAP_ENTRY(i, 0, SYSTEM_RAM_LOW, 0x00200000, (0x10000000 - 0x00200000 - 0x01000000) >> 20);
+ 	EMAP_ENTRY(i, 0, SYSTEM_RAM_LOW, 0x00200000, 0x98);
  	 /* for entry with mem_size < 1M, we set bit31 to 1 to indicate
  	  * that the unit in mem_size is Byte not MBype*/
-	if (high_size <= (0x60000000 >> 20)) {
-		// Low shadow only
-		EMAP_ENTRY(i, 0, SYSTEM_RAM_HIGH, 0x90000000, high_size);
-	} else {
-		// Low shadow + rest high
-		EMAP_ENTRY(i, 0, SYSTEM_RAM_HIGH, 0x90000000, 0x60000000 >> 20);
- 		EMAP_ENTRY(i, 0, SYSTEM_RAM_HIGH, 0x110000000 + 0x60000000, high_size - (0x60000000 >> 20));
-	}
+ 	EMAP_ENTRY(i, 0, SYSTEM_RAM_HIGH, 0x110000000, atoi(getenv("ihighmemsize")) - VRAM_SIZE);
  	EMAP_ENTRY(i, 0, SMBIOS_TABLE, (SMBIOS_PHYSICAL_ADDRESS & 0x0fffffff),
  			(SMBIOS_SIZE_LIMIT >> 20));
+ 	EMAP_ENTRY(i, 0, UMA_VIDEO_RAM, 0x110000000, VRAM_SIZE);
 
-	emap->vers = 0;
-	emap->nr_map = i;
-
+	emap->vers = 1;
+#else
+	struct efi_memory_map_loongson *emap = &g_map;
+	
+	emap->nr_map = 7;
+	emap->mem_freq = 266000000; //266Mhz
+	
+	//SYSTEM_RAM_LOW
+	emap->map[0].node_id = 0;
+	emap->map[0].mem_type = 1;
+	emap->map[0].mem_start = 0x00200000;
+	//gpu and frame buffer address 0x0a00_0000~0x0f00_0000
+	emap->map[0].mem_size = 0x98;
+	
+	//SYSTEM_RAM_HIGH
+	emap->map[1].node_id = 0;
+	emap->map[1].mem_type = 2;
+	emap->map[1].mem_start = 0x110000000 + (VRAM_SIZE << 20);
+	emap->map[1].mem_size = atoi(getenv("highmemsize")) - VRAM_SIZE;
+	
+	//SMBIOS_TABLE
+	emap->map[2].node_id = 0;
+	emap->map[2].mem_type = 10;
+	emap->map[2].mem_start = SMBIOS_PHYSICAL_ADDRESS & 0x0fffffff;
+	emap->map[2].mem_size = SMBIOS_SIZE_LIMIT >> 20;
+	
+	//UMA_VIDEO_RAM
+	emap->map[6].node_id = 0;
+	emap->map[6].mem_type = 11;
+	emap->map[6].mem_start = 0x110000000;
+	emap->map[6].mem_size = VRAM_SIZE;
+#endif
 	return emap;
-#undef	EMAP_ENTRY
 }

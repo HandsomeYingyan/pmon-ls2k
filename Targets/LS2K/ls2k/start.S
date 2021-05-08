@@ -152,9 +152,6 @@
 #define REMAP_DDR_DMA 0x00e00000 //0x80e00000 
 
 #endif
-#ifndef PCIE_LANE_FLIP
-#define PCIE_LANE_FLIP 0x300 /*pcie1 port0 rx, tx lane revert*/
-#endif
 
 	.set	noreorder
 	.globl	_start
@@ -206,40 +203,6 @@ stack = start - 0x4000		/* Place PMON stack below PMON start in RAM */
 #endif
 	bal watchdog_close
 	nop
-#ifdef GPIO_PINS
-	li	v0, 0xbfe10420
-	ld	v1, (v0)
-	dli	a0, LS2K_SELGPIO
-	or	v1, a0
-	xor	v1, a0
-	sd	v1, (v0)
-#endif
-
-#ifdef GPIO_OUT_PINS
-	li v0, 0xbfe10500
-	ld v1, (v0)
-	dli a0, GPIO_OUT_PINS
-	or v1, a0
-	xor v1, a0
-	sd v1, (v0)
-#endif
-
-#ifdef GPIO_OUT_CLR
-	li v0, 0xbfe10500
-	ld v1, 0x10(v0)
-	dli a0, GPIO_OUT_CLR
-	or v1, a0
-	xor v1, a0
-	sd v1, 0x10(v0)
-#endif
-
-#ifdef GPIO_OUT_SET
-	li v0, 0xbfe10500
-	ld v1, 0x10(v0)
-	dli a0, GPIO_OUT_SET
-	or v1, a0
-	sd v1, 0x10(v0)
-#endif
 
 	/* init processor state at first*/
 /* NOTE!! Not more that 16 instructions here!!! Right now it's FULL! */
@@ -325,7 +288,7 @@ ext_map_and_reboot:
 	bal	stringserial
 	nop
 	b	exc_common
-
+	
 	.align	8			/* bfc00400 */
 	move	k0, ra		#save ra
 	la	a0, v400_msg
@@ -335,140 +298,13 @@ ext_map_and_reboot:
 #if 1
 	b	exc_common
 	nop
-#endif
-#ifdef LS2K_STR
-	.align 8           /* bfc00500 */
-	.set mips64
 
-
-	/* store ra and sp to memory */
-	dli t0, 0x900000000faaa040
-	sd  a0, 0x0(t0) //store ra
-
-	dli t1, 0x900000000faaa048
-	sd  a1, 0x0(t1) //store sp
-
-	dli t2, 0x900000000faaa050
-	dli t0, 0x5a5a5a5a5a5a5a5a
-	sd  t0, 0x0(t2) //store str flag
-
-	.set mips3
-	la  s0, start
-	li  a0, 0xbfc00000
-	subu    s0, a0, s0
-	and s0, 0xffff0000
-
-1:  	li v1,0x100
-	subu    v1, v1, 0x1
-	nop
-
-1:  	lui t0, 0xbfe1  /* Enable DDR control register  */
-	ld  t1, 0x0420(t0)
-	nop
-	dli t2, (0x1 << 41)
-	or t1, t1, t2
-	sd  t1, 0x0420(t0)
-
-	dli t2, ~(0x1 << 40)
-	and t1, t1, t2
-	sd  t1, 0x0420(t0)
-	sync
-
-	.set mips64
-	li  a0,0x0
-	dli t0, 0x900000001fe10000
-
-	STR_XBAR_CONFIG_NODE_a0(0x10, \
-			0x0000000000000000, \
-			0xfffffffff0000000, \
-			0x00000000000000f0)
-
-	dli a0, 0x900000000ff00000
-	ld  t1, 0x198(a0)
-	dli t3, 0x0000000f00000000
-	or  t1, t1, t3  /* bit32 for self refresh*/
-	sd  t1, 0x198(a0)
-	sync
-
-	/* Don't forget to recovery the XbarII config Window */
-	li  a0,0x0
-	dli t0, 0x900000001fe10000
-	STR_XBAR_CONFIG_NODE_a0(0x10, \
-			0x0000000000000000, \
-			0xfffffffff0000000, \
-			0x00000000000000f0)
-	sync
-	sync
-	sync
-	sync
-	sync
-
-	/* delay */
-	//li  t0, 0x400000
-	li  t0, 0x40
-	1:
-	subu    t0, t0, 0x1
-	bnez    t0, 1b
-	nop
-
-	li  t0,0xbfe07000
-	/* set key,usb,gmac wakeup of reg GPE0_EN */
-	lw  t1, 0x2c(t0)
-	li  t3, (0x1 << 8)|(0x3f<<10)|(0x1<<6)|(0x1<<5)
-	or  t1, t1, t3
-	sw  t1, 0x2c(t0)
-
-	/* set USB_GMAC_OK of reg PMCON_RESUME */
-	lw  t1, 0x04(t0)
-	li  t3, (0x1<<7)
-	or  t1, t1, t3
-	sw  t1, 0x04(t0)
-
-	/* set WOL_BAT_EN of reg PMCON_RTC */
-	lw  t1, 0x08(t0)
-	li  t3, (0x1<<7)
-	or  t1, t1, t3
-	sw  t1, 0x08(t0)
-
-	/* clear 0-15 of reg GPE0_STS */
-	lw  t1, 0x28(t0)
-	li  t3, 0x0000ffff
-	sw  t3, 0x28(t0)
-
-	/*clean acpi wake status*/
-	lw t1, 0x0c(t0)
-	li t3, 0x8100
-	sw t3, 0x0c(t0)
-
-	/*clean acpi pwrbtn staus*/
-	lw t1, 0x10(t0)
-	li t3, (0x1 << 8)
-	or t1, t1, t3
-	sw t1, 0x10(t0)
-
-	PRINTSTR("\nSystem Enter S3!!!\n")
-
-	/* enable acpi porbtn and set acpi alptype is S3 status*/
-	lw t1, 0x14(t0)
-	li t3, 0x3400
-	sw t3, 0x14(t0)
-	nop
-
-	/* delay */
-	li t0, 0x4000
-	2:
-	subu t0, t0, 0x1
-	bnez t0, 2b
-	nop
-
-	1:
-	b 1b
-	nop
-#endif
 	/* Debug exception */
 	.align  7           /* bfc00480 */
-#include "exc_ejtag.S"
+	#include "exc_ejtag.S"
+#endif
 
+	
 exc_common:
 	PRINTSTR("\r\nCAUSE=")
 	mfc0	a0, COP_0_CAUSE_REG
@@ -630,6 +466,7 @@ cp0_main:
 	bal	beep_on
 #endif
 	nop
+
 	li	a0, 0x8000
 1:
 	addiu	a0, -1
@@ -646,35 +483,8 @@ cp0_main:
 	ori	t2, t2, 0x2
 	sw	t2, 0x1004(t0)
 
-#ifdef LOWPOWER
-	li v0, 0xbfc00000 + NVRAM_OFFS + SHUTDEV_OFFS
-	lbu t1, 3(v0)
-	xor t1, 0x5a
-	bnez t1, 1f
-	nop
-	lbu t1, 0(v0)
-	and t1, 0xc
-	xor t1, 0xc
-	beqz t1, pcie_cfg_done
-	nop
-1:
-#endif
-#if 1	//xwr pcie signal test
-        li      t0, 0xbfe10000
 
-	li	t1, 0xc2492331
-	sw	t1, 0x580(t0)
-	sw	t1, 0x5a0(t0)
 
-	li	t1, 0xff3ff0a8
-	sw	t1, 0x584(t0)
-	sw	t1, 0x5a4(t0)
-
-	li	t1, 0x27fff
-	sw	t1, 0x588(t0)
-	sw	t1, 0x5a8(t0)
-
-#endif
 /* mtf add for cfg pcie */
 	
         li      t0, 0xbfe10590
@@ -715,13 +525,6 @@ cp0_main:
 
 
 	dli	t0, 0x900000fe00006800
-#if defined(FORCE_PCIE_GEN1) && FORCE_PCIE_GEN1 & 0x10
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    t1, 0xa0(t0)
-    or	    t1, 3
-    xor     t1, 2
-    sw      t1, 0xa0(t0)
-#endif
 	li	t1, 0x10000000
 	sw	t1, 0x10(t0)
 
@@ -738,8 +541,11 @@ cp0_main:
     lw  t2, 0x58(t0)
     and t2, t2, t1
     sw  t2, 0x58(t0)
-
-	dli	t1, 0xff204c | ((PCIE_LANE_FLIP>>(2*4)) & 3)
+#ifndef PCI1_P0_TXRX_REVERSE
+	dli	t1, 0xff204c
+#else
+	dli	t1, 0xff204f
+#endif
         sw      t1, 0x0(t0)
   
 //pcie1 port1
@@ -757,13 +563,6 @@ cp0_main:
     sw  t2, 0x0(t0)
 
 	dli	t0, 0x900000fe00007000
-#if defined(FORCE_PCIE_GEN1) && FORCE_PCIE_GEN1 & 0x20
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    t1, 0xa0(t0)
-    or	    t1, 3
-    xor     t1, 2
-    sw      t1, 0xa0(t0)
-#endif
 	li	t1, 0x10100000
 	sw	t1, 0x10(t0)
 
@@ -781,7 +580,7 @@ cp0_main:
     and t2, t2, t1
     sw  t2, 0x58(t0)
 
-	dli	t1, 0xff204c | ((PCIE_LANE_FLIP>>(2*5)) & 3)
+	dli	t1, 0xff204c
         sw      t1, 0x0(t0)
   
 //pcie0 port0
@@ -799,13 +598,6 @@ cp0_main:
     sw  t2, 0x0(t0)
 
 	dli	t0, 0x900000fe00004800
-#if defined(FORCE_PCIE_GEN1) && FORCE_PCIE_GEN1 & 1
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    t1, 0xa0(t0)
-    or	    t1, 3
-    xor     t1, 2
-    sw      t1, 0xa0(t0)
-#endif
 	li	t1, 0x11000000
 	sw	t1, 0x10(t0)
 
@@ -823,7 +615,7 @@ cp0_main:
     and t2, t2, t1
     sw  t2, 0x58(t0)
 
-	dli	t1, 0xff204c | ((PCIE_LANE_FLIP>>(2*0)) & 3)
+	dli	t1, 0xff204c
         sw      t1, 0x0(t0)
   
 //pcie0 port1
@@ -841,13 +633,6 @@ cp0_main:
     sw  t2, 0x0(t0)
 
 	dli	t0, 0x900000fe00005000
-#if defined(FORCE_PCIE_GEN1) && FORCE_PCIE_GEN1 & 2
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    t1, 0xa0(t0)
-    or	    t1, 3
-    xor     t1, 2
-    sw      t1, 0xa0(t0)
-#endif
 	li	t1, 0x11100000
 	sw	t1, 0x10(t0)
 
@@ -865,7 +650,7 @@ cp0_main:
     and t2, t2, t1
     sw  t2, 0x58(t0)
 
-	dli	t1, 0xff204c | ((PCIE_LANE_FLIP>>(2*1)) & 3)
+	dli	t1, 0xff204c
         sw      t1, 0x0(t0)
   
 //pcie0 port2
@@ -877,13 +662,6 @@ cp0_main:
 	sw	t1, 0x0(t0)
 
 	dli	t0, 0x900000fe00005800
-#if defined(FORCE_PCIE_GEN1) && FORCE_PCIE_GEN1 & 4
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    t1, 0xa0(t0)
-    or	    t1, 3
-    xor     t1, 2
-    sw      t1, 0xa0(t0)
-#endif
 	li	t1, 0x11200000
 	sw	t1, 0x10(t0)
 
@@ -891,18 +669,7 @@ cp0_main:
 	li      t1, 0x11200000
 	or	t0, t0, t1
 
-    li  t1, (0x7<<18)|(0x7<<2)
-    not t1, t1
-    lw  t2, 0x54(t0)
-    and t2, t2, t1
-    sw  t2, 0x54(t0)
-
-    lw  t2, 0x58(t0)
-    and t2, t2, t1
-    sw  t2, 0x58(t0)
-
-
-	dli	t1, 0xff204c | ((PCIE_LANE_FLIP>>(2*2)) & 3) 
+	dli	t1, 0xff204c
         sw      t1, 0x0(t0)
   
 //pcie0 port3
@@ -914,13 +681,6 @@ cp0_main:
 	sw	t1, 0x0(t0)
 
 	dli	t0, 0x900000fe00006000
-#if defined(FORCE_PCIE_GEN1) && FORCE_PCIE_GEN1 & 8
-//pcie capability link control 2, target link speed(bit 3:0)
-    lw 	    t1, 0xa0(t0)
-    or	    t1, 3
-    xor     t1, 2
-    sw      t1, 0xa0(t0)
-#endif
 	li	t1, 0x11300000
 	sw	t1, 0x10(t0)
 
@@ -928,48 +688,20 @@ cp0_main:
 	li      t1, 0x11300000
 	or	t0, t0, t1
 
-    li  t1, (0x7<<18)|(0x7<<2)
-    not t1, t1
-    lw  t2, 0x54(t0)
-    and t2, t2, t1
-    sw  t2, 0x54(t0)
-
-    lw  t2, 0x58(t0)
-    and t2, t2, t1
-    sw  t2, 0x58(t0)
-
-
-	dli	t1, 0xff204c | ((PCIE_LANE_FLIP>>(2*3)) & 3)
+	dli	t1, 0xff204c
         sw      t1, 0x0(t0)
 
-pcie_cfg_done:
 	bal	initserial
 	nop
 
 	PRINTSTR("\r\ninitserial good ^_^...\r\n")
 	nop
 
-#if defined(LS2K_RESET_GPIOS_MASK)
-	// Set Reset GPIOs to output mode
-	li	t1, 0xbfe10500
-	dli	t2, ~(LS2K_RESET_GPIOS_MASK)
-	ld	t3, 0x0(t1)
-	and	t2, t3
-	sd	t2, 0x0(t1)
-
-	// Set output to low level
-	li  t1, 0xbfe10510
-	dli	t2, ~(LS2K_RESET_GPIOS_MASK)
-	ld	t3, 0x0(t1)
-	and	t2, t3
-	sd	t2, 0x0(t1)
-#elif !defined(GPIO_OUT_PINS) || ((GPIO_OUT_PINS &(1<<34)) && (!defined(GPIO_OUT_SET) || (GPIO_OUT_SET & (1<<34))))
-	// gmac1 phy reset (legacy)
-	// Not required on new 2k
 	bal	ls2k_version
 	nop
 	bnez	v0,2f
 	nop
+	//gmac1 phy reset
 	li t1,0xbfe10500
 	li t2,(1 << 2) //34 - 2
 	not t2,t2
@@ -983,21 +715,12 @@ pcie_cfg_done:
 	and t2,t3 
 	sw t2,0x14(t1)
 2:
-#endif
 
 #include "loongson3_clksetting.S"
 
 	bal 	initserial_later
 	nop
 
-#if defined(LS2K_RESET_GPIOS_MASK)
-	// Reset GPIOs: set back to high
-	li t1,0xbfe10510
-	dli t2, LS2K_RESET_GPIOS_MASK
-	ld t3, 0x0(t1)
-	or t2, t3
-	sd t2, 0x0(t1)
-#elif !defined(GPIO_OUT_PINS) || ((GPIO_OUT_PINS &(1<<34)) && (!defined(GPIO_OUT_SET) || (GPIO_OUT_SET & (1<<34))))
 	bal	ls2k_version
 	nop
 	bnez	v0,2f
@@ -1009,8 +732,6 @@ pcie_cfg_done:
 	or t2,t3 
 	sw t2,0x14(t1)
 2:
-#endif
-
 #if 1 /* Config SATA : use internel clock */
 	li	    t0, 0xbfe10000
 
@@ -1019,7 +740,7 @@ pcie_cfg_done:
     li      t1, 0xf300040f
     sw      t1, 0x450(t0)
 
-#if 1
+#if 1 /* Config SATA : use internel clock */
 	PRINTSTR("\r\nUSE internel SATA ref clock\r\n")
 	li	t1, 0xbfe10450
 	ld	a0, 0x0(t1)
@@ -1044,75 +765,12 @@ pcie_cfg_done:
 	ld	a0, 0x0(t1)
 	bal	hexserial64
 	nop
-#endif
 
-#if 0
-    li      t0, 0xbfe10000
-
-    //assert p0 reset
-    lw      t1, 0x450(t0)
-    li      t2, (1 << 3)
-    not     t2, t2
-    and     t1, t1, t2
-    sw      t1, 0x450(t0)
-
-    //assert phy reset
-    lw      t1, 0x450(t0)
-    li      t2, (1 << 2)
-    not     t2, t2
-    and     t1, t1, t2
-    sw      t1, 0x450(t0)
-
-    //power down phy
-    lw      t1, 0x454(t0)
-    li      t2, (1 << 31)
-    or      t1, t1, t2
-    sw      t1, 0x454(t0)
-
-    //switch refclk
-    lw      t1, 0x450(t0)
-    li      t2, (1 << 1)
-    not     t2, t2
-    and     t1, t1, t2
-    sw      t1, 0x450(t0)
-
-    //delay a while
-    li      t1, 0x1000
-1:
-    subu    t1, t1, 1
-    bnez    t1, 1b
-    nop
-
-
-    //power up phy
-    lw      t1, 0x454(t0)
-    li      t2, (1 << 31)
-    not     t2, t2
-    and     t1, t1, t2
-    sw      t1, 0x454(t0)
-
-    //deassert phy reset
-    lw      t1, 0x450(t0)
-    li      t2, (1 << 2)
-    or      t1, t1, t2
-    sw      t1, 0x450(t0)
 	
-    //deassert p0 reset
-    lw      t1, 0x450(t0)
-    li      t2, (1 << 3)
-    or      t1, t1, t2
-    sw      t1, 0x450(t0)
-
-    //delay a while
-    li      t1, 0x10000
-1:
-    subu    t1, t1, 1
-    bnez    t1, 1b
-    nop
 #endif
 #endif
 
-#ifdef LS2K_SATA_TX_CFG /* Config SATA TX signal (Undocumented register) */
+#if 1 /* Config SATA TX signal*/
         li      t0, 0xbfe10458
         dli     t1, 0x1403f1002
         sd      t1, 0x0(t0)
@@ -1197,14 +855,6 @@ start_now:
 	//no hda, no ac97
 	ori	t1, t1, 0x3f48
 	or	t2, t2, t1
-#ifdef GPIO_PINS
-	li	a0, (LS2K_SELGPIO & 0xffffffff)
-	or	t2, a0
-	xor	t2, a0
-#endif
-#ifdef LS2K_SELLIO
-	or t2, 0x80
-#endif
 	sw	t2, 0x0(t0)
 	
 
@@ -1227,7 +877,7 @@ start_now:
 //#define DEBUG_AUTO_ARB_LEVEL
 #endif
 //#define  DISABLE_DDR_A15
-//#define DEBUG_DDR
+#define DEBUG_DDR
 //#define DEBUG_DDR_PARAM
 //#define PRINT_DDR_LEVELING
 //#define DLL_DELAY_LOOP
@@ -1643,7 +1293,6 @@ LEAF(ls2k_version)
 	.set    mips32
 	li a0,0xbfc00000+ NVRAM_OFFS + VER_OFFS
 	lbu v0, (a0)
-	xor v0, 0x50
 	li a0, 2
 	sltu a0, v0, a0
 	beqz a0, 1f
@@ -2094,42 +1743,54 @@ LEAF(tgt_getchar)
 END(tgt_getchar)
 
 #ifndef BEEP_GPIO
-#define BEEP_GPIO 39
+#define BEEP_GPIO 35
 #endif
 
 LEAF(HS0636_beep_on)
-//enable output
-	li	t1, 0xbfe10500 + BEEP_GPIO*4/32
+	li	t0, 0xbfe10504
+	li	t1, 0
+	sw	t1, 0(t0)
 
-	li	v1, (1<<(BEEP_GPIO&31))
-	lw	t0, 0(t1)
-	or	t0, v1
-	xor	t0, v1
-	sw	t0, 0(t1)
-
-	li	t1, 0xbfe10510 + BEEP_GPIO*4/32
 	li	a1, 0x80
 222:
-	li	v1, (1<<(BEEP_GPIO&31))
-	lw	t0, 0(t1)
-	or	t0, v1
-	xor	t0, v1
-	sw	t0, 0(t1)
+	li	t0, 0xbfe10514
+	li	t1, 0x0
+	sw	t1, 0(t0)
 
-	li	a0, 0xd
+	li	a0, 0xc
 1:
 	addiu	a0, -1
 	nop
 	bnez	a0, 1b
 	nop
 
-	li	v1, (1<<(BEEP_GPIO&31))
-	lw	t0, 0(t1)
-	or	t0, v1
-	sw	t0, 0(t1)
+	li	t0, 0xbfe10514
+	li	t1, 0x80
+	sw	t1, 0(t0)
 
+	li	a0, 0xc
+1:
+	addiu	a0, -1
+	nop
+	bnez	a0, 1b
+	nop
 
-	li	a0, 0xd
+	li	t0, 0xbfe10514
+	li	t1, 0x0
+	sw	t1, 0(t0)
+
+	li	a0, 0xc
+1:
+	addiu	a0, -1
+	nop
+	bnez	a0, 1b
+	nop
+
+	li	t0, 0xbfe10514
+	li	t1, 0x80
+	sw	t1, 0(t0)
+
+	li	a0, 0xb
 1:
 	addiu	a0, -1
 	nop
@@ -2301,17 +1962,14 @@ nvram_offs:
     .global ddr3_reg_data
 
     .align  5
-#ifdef SPECIAL_MC_PARAM
-#if defined(CONFIG_DDR_16BIT)
-#include "loongson_mc2_param-ddr16bit.S"
-#elif defined(CONFIG_DDR_32BIT)
+#ifdef CONFIG_DDR_32BIT
 #include "loongson_mc2_param-ddr32bit.S"
-#else
-#error "No special MC param"
-#endif
+#elif defined(CONFIG_DDR_16BIT)
+#include "loongson_mc2_param-ddr16bit.S"
 #else
 #include "loongson_mc2_param.S"
 #endif
+
 
 #ifdef  ARB_LEVEL
 	.text
