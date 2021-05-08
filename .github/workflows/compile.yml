@@ -16,7 +16,7 @@ jobs:
     - name: install deps
       run: sudo apt-get install -y flex bison xutils-dev
     - name: Download toolchain
-      run: wget -O /tmp/gcc-4.4.0-pmon.tgz ftp://ftp.loongnix.org/embed/ls3a/toolchain/gcc-4.4-gnu.tar.gz
+      run: wget -O /tmp/gcc-4.4.0-pmon.tgz ftp://ftp.loongnix.org/embedd/ls3a/toolchain/gcc-4.4-gnu.tar.gz
     - name: Install toolchain
       run: sudo tar -zxvf /tmp/gcc-4.4.0-pmon.tgz -C /opt/
 
